@@ -81,6 +81,7 @@ typedef struct {
 #define DSN_EV_SWIPE_DOWN 8
 #define DSN_EV_SWIPE_LEFT 9
 #define DSN_EV_SWIPE_RIGHT 10
+#define DSN_EV_TIMER 11  // periodic host wake for background pairing checks; no user input
 #define DSN_EV_TYPE(e) ((e) & 0xff)
 #define DSN_EV_X(e) (((e) >> 8) & 0xfff)
 #define DSN_EV_Y(e) (((e) >> 20) & 0xfff)

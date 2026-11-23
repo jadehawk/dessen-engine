@@ -2,7 +2,7 @@
 // binding as the firmware, with a draw target that prints each call. Keys on
 // stdin stand in for buttons: c confirm, b back, p prev, n next;
 // L/R swipe in the lower card (400,380), l/r swipe above it (400,150).
-// u/d emulate the configured side page buttons. Exits with
+// u/d emulate the configured side page buttons; z is a timer wake. Exits with
 // the app's exit code, or 101 on a memory fault and 102 on an illegal instruction.
 #include <cstdio>
 #include <cstdlib>
@@ -28,7 +28,8 @@ int main(int argc, char** argv) {
   // from DESSEN_NET_ROOT fixtures when set, crypto via libcrypto.
   const char* fsRoot = getenv("DESSEN_FS_ROOT");
   const char* netRoot = getenv("DESSEN_NET_ROOT");
-  dessen::DesktopServices services(fsRoot ? fsRoot : "", "/app", netRoot ? netRoot : "");
+  const char* appDir = getenv("DESSEN_APP_DIR");
+  dessen::DesktopServices services(fsRoot ? fsRoot : "", appDir ? appDir : "/app", netRoot ? netRoot : "");
   host.setServices(&services);
 
   TraceTarget target;
@@ -59,7 +60,10 @@ int main(int argc, char** argv) {
       if (host.launch() == dessen::Launch::Home) {
         printf("[launch home %d]\n", host.launchHomeDest());
       } else {
-        const char* k = host.launch() == dessen::Launch::Reader     ? "reader"
+        const char* k = host.launch() == dessen::Launch::NativeStatsPair ? "stats-pair"
+                        : host.launch() == dessen::Launch::NativeStatsRefresh ? "stats-refresh"
+                         : host.launch() == dessen::Launch::NativeStatsUnpair ? "stats-unpair"
+                        : host.launch() == dessen::Launch::Reader     ? "reader"
                         : host.launch() == dessen::Launch::Settings ? "settings"
                         : host.launch() == dessen::Launch::App      ? "app"
                                                                     : "browser";
@@ -75,6 +79,16 @@ int main(int argc, char** argv) {
     // u/d emulate the physical side page keys, p/n the four-key front row.
     input.focusPrev = c == 'u';
     input.focusNext = c == 'd';
+    // Fixture-only tap controls: t targets the Reading Statistics sync button
+    // on the default landscape screen; x is outside its hit area.
+    if (c == 't' || c == 'T' || c == 'x' || c == 'm' || c == 'Y' || c == 'N') {
+      input.touchReleased = true;
+      input.touchX = c == 'Y' ? screen.width / 4 : c == 'N' ? screen.width * 3 / 4 : screen.width / 2;
+      input.touchY = c == 'Y' || c == 'N' ? screen.height / 2 + 45
+                   : c == 'm' ? 85 : c == 't' ? screen.height - 70
+                   : c == 'T' ? screen.height - 105 : 180;
+    }
+    if (c == 'z') gesture = dessen::FreeInkHost::WakeTick;
     if (c == 'L' || c == 'l' || c == 'R' || c == 'r') {
       input.touchX = 400;
       input.touchY = (c == 'L' || c == 'R') ? 380 : 150;

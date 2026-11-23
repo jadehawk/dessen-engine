@@ -21,7 +21,7 @@ enum class State : uint8_t {
 
 // What a launcher/home app asked the host to open (see State::Launch). The host
 // opens the screen and tears the app down; the app does not resume.
-enum class Launch : uint8_t { None, Reader, Settings, Browser, Home, App };
+enum class Launch : uint8_t { None, Reader, Settings, Browser, Home, App, NativeStatsPair, NativeStatsRefresh, NativeStatsUnpair };
 
 class Services;
 
@@ -42,7 +42,7 @@ class FreeInkHost {
   // the panel-space gesture start point (or -1 when not available). The Dessen
   // event encoder converts it into safe-area coordinates. This avoids adding
   // a second gesture-position channel to the shared InputSnapshot.
-  enum Swipe { SwipeNone = 0, SwipeUp, SwipeDown, SwipeLeft, SwipeRight };
+  enum Swipe { SwipeNone = 0, SwipeUp, SwipeDown, SwipeLeft, SwipeRight, WakeTick };
   State step(freeink::ui::DrawTarget& target, const freeink::ui::DeviceContext& device,
              const freeink::ui::InputSnapshot& input, Swipe swipe = SwipeNone, uint32_t budget = 200000);
 

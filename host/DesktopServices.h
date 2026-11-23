@@ -4,6 +4,7 @@
 // so apps and the binding are testable on a workstation.
 #pragma once
 #include <string>
+#include <cstdlib>
 
 #include "DessenServices.h"
 
@@ -34,6 +35,7 @@ class DesktopServices : public Services {
   int recentShelf(uint32_t first, uint32_t count, char* out, uint32_t cap) override;
   int bookCover(const char*, uint32_t, uint8_t*, uint32_t) override { return 0; }  // desktop has no covers
   int bookProgress(const char* path) override;
+  int nativeStatsMode() override { return std::getenv("DESSEN_NATIVE_STATS") ? 1 : 0; }
   // crypto
   int hash(int algo, const uint8_t* data, uint32_t n, uint8_t* out, uint32_t cap) override;
   int aesCbc(int flags, const uint8_t* keyiv, const uint8_t* data, uint32_t n, uint8_t* out, uint32_t cap) override;

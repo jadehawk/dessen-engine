@@ -622,3 +622,31 @@ case 105: { // book_cover
   a[0] = result;
   break;
 }
+case 106: { // qr_bitmap
+  const uint32_t link_len = a[1];
+  const uint8_t* link = static_cast<const uint8_t*>(dvm_ptr(vm, a[0], link_len));
+  (void)link_len;
+  if (!link) { a[0] = static_cast<uint32_t>(-1); break; }
+  const uint32_t pixels_len = a[3];
+  uint8_t* pixels = static_cast<uint8_t*>(dvm_ptr(vm, a[2], pixels_len));
+  (void)pixels_len;
+  const uint32_t pixels_addr = a[2]; (void)pixels_addr;
+  if (!pixels) { a[0] = static_cast<uint32_t>(-1); break; }
+  uint32_t result = 0;
+  result = self.services() ? self.services()->qrBitmap(reinterpret_cast<const char*>(link), link_len, pixels, pixels_len) : DSN_ERR_UNAVAILABLE;
+  a[0] = result;
+  break;
+}
+case 107: { // native_stats_mode
+  uint32_t result = 0;
+  result = self.services() ? self.services()->nativeStatsMode() : 0;
+  a[0] = result;
+  break;
+}
+case 108: { // native_stats
+  const uint32_t action = static_cast<uint8_t>(a[0] >> 0); (void)action;
+  uint32_t result = 0;
+  return self.requestLaunch(action == 0 ? 5 : action == 1 ? 6 : action == 2 ? 7 : 0, 0, 0);
+  a[0] = result;
+  break;
+}

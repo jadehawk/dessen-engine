@@ -31,6 +31,7 @@ View viewOf(const DeviceContext& device) {
 uint32_t eventOf(const InputSnapshot& in, View view, FreeInkHost::Swipe swipe) {
   if (in.confirm) return DSN_EV_CONFIRM;
   if (in.back) return DSN_EV_BACK;
+  if (swipe == FreeInkHost::WakeTick) return DSN_EV_TIMER;
   uint32_t kind = 0;
   switch (swipe) {
     case FreeInkHost::SwipeUp: kind = DSN_EV_SWIPE_UP; break;
@@ -342,6 +343,9 @@ int FreeInkHost::requestLaunch(int kind, const uint8_t* path, uint32_t pathLen) 
             : kind == 2 ? Launch::Settings
             : kind == 3 ? Launch::Browser
             : kind == 4 ? Launch::App
+            : kind == 5 ? Launch::NativeStatsPair
+            : kind == 6 ? Launch::NativeStatsRefresh
+              : kind == 7 ? Launch::NativeStatsUnpair
                         : Launch::None;
   launchPath_[0] = '\0';
   if (launch_ == Launch::None) {

@@ -95,3 +95,6 @@
 101 open_home(u8 dest) -> i32   : return self.requestLaunchHome((int)dest);
 103 wifi_connect() -> i32 : return self.beginWifi();
 105 book_cover(buf path, u16 height, out pixels) -> i32 : result = svcBookCover(self, path, path_len, height, pixels, pixels_len);
+106 qr_bitmap(buf link, out pixels) -> i32 : result = self.services() ? self.services()->qrBitmap(reinterpret_cast<const char*>(link), link_len, pixels, pixels_len) : DSN_ERR_UNAVAILABLE;
+107 native_stats_mode() -> i32 : result = self.services() ? self.services()->nativeStatsMode() : 0;
+108 native_stats(u8 action) -> i32 : return self.requestLaunch(action == 0 ? 5 : action == 1 ? 6 : action == 2 ? 7 : 0, 0, 0);

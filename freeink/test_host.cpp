@@ -306,6 +306,11 @@ int main(int argc, char** argv) {
   assert(host.exitCode() == DSN_EV_BACK);
 
   using Host = dessen::FreeInkHost;
+  assert(host.load(mem, readApp(argv[1]), sizeof mem));
+  while (host.step(target, screen, none) == dessen::State::Running) {}
+  assert(host.step(target, screen, none, Host::WakeTick) == dessen::State::Exited);
+  assert(host.exitCode() == DSN_EV_TIMER); // never impersonate confirm/tap
+
   for (auto dir : {std::pair{Host::SwipeUp, DSN_EV_SWIPE_UP}, {Host::SwipeDown, DSN_EV_SWIPE_DOWN},
                    {Host::SwipeLeft, DSN_EV_SWIPE_LEFT}, {Host::SwipeRight, DSN_EV_SWIPE_RIGHT}}) {
     assert(host.load(mem, readApp(argv[1]), sizeof mem));
