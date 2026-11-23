@@ -31,17 +31,28 @@ View viewOf(const DeviceContext& device) {
 uint32_t eventOf(const InputSnapshot& in, View view, FreeInkHost::Swipe swipe) {
   if (in.confirm) return DSN_EV_CONFIRM;
   if (in.back) return DSN_EV_BACK;
+  uint32_t kind = 0;
   switch (swipe) {
-    case FreeInkHost::SwipeUp: return DSN_EV_SWIPE_UP;
-    case FreeInkHost::SwipeDown: return DSN_EV_SWIPE_DOWN;
-    case FreeInkHost::SwipeLeft: return DSN_EV_SWIPE_LEFT;
-    case FreeInkHost::SwipeRight: return DSN_EV_SWIPE_RIGHT;
+    case FreeInkHost::SwipeUp: kind = DSN_EV_SWIPE_UP; break;
+    case FreeInkHost::SwipeDown: kind = DSN_EV_SWIPE_DOWN; break;
+    case FreeInkHost::SwipeLeft: kind = DSN_EV_SWIPE_LEFT; break;
+    case FreeInkHost::SwipeRight: kind = DSN_EV_SWIPE_RIGHT; break;
     default: break;
+  }
+  if (kind != 0) {
+    const int32_t x = in.touchX - view.originX, y = in.touchY - view.originY;
+    if (in.touchX >= 0 && in.touchY >= 0 && x >= 0 && y >= 0 && x < view.width && y < view.height &&
+        x <= 0xfff && y <= 0xfff) {
+      return kind | (static_cast<uint32_t>(x) << 8) | (static_cast<uint32_t>(y) << 20);
+    }
+    return kind; // synthetic swipe, or start outside the drawable safe area
   }
   if (in.swipeLeft) return DSN_EV_SWIPE_LEFT;
   if (in.swipeRight) return DSN_EV_SWIPE_RIGHT;
-  if (in.prev || in.focusPrev) return DSN_EV_PREV;
-  if (in.next || in.focusNext) return DSN_EV_NEXT;
+  if (in.focusPrev) return DSN_EV_PREV | DSN_EV_SIDE_BUTTON;
+  if (in.focusNext) return DSN_EV_NEXT | DSN_EV_SIDE_BUTTON;
+  if (in.prev) return DSN_EV_PREV;
+  if (in.next) return DSN_EV_NEXT;
   if (in.touchReleased) {  // a tap, or a press-and-hold, both with coordinates
     const int32_t x = in.touchX - view.originX, y = in.touchY - view.originY;
     if (in.touchX < 0 || in.touchY < 0 || x < 0 || y < 0 || x >= view.width || y >= view.height) return 0;
@@ -112,7 +123,7 @@ Paint paint(uint32_t color) {
 
 TextStyle textStyle(uint32_t font, uint32_t align, uint32_t maxLines, uint32_t flags) {
   TextStyle st;
-  st.font = static_cast<FontId>(font <= DSN_FONT_TITLE ? font : DSN_FONT_SMALL);
+  st.font = static_cast<FontId>(font <= DSN_FONT_NOTOSANS_18 ? font : DSN_FONT_SMALL);
   st.align = align == DSN_ALIGN_CENTER ? TextAlign::Center : align == DSN_ALIGN_RIGHT ? TextAlign::Right : TextAlign::Left;
   st.maxLines = static_cast<uint8_t>(maxLines < 1 ? 1 : maxLines > 16 ? 16 : maxLines);
   st.bold = flags & DSN_TEXT_BOLD;

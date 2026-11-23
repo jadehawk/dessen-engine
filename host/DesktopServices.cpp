@@ -307,17 +307,38 @@ int DesktopServices::recentShelf(uint32_t first, uint32_t count, char* out, uint
       if (fixture == &recentsFixture) opened.push_back(path);
       else if (std::find(opened.begin(), opened.end(), path) != opened.end()) continue;
       if (first) { --first; continue; }
-      const auto lastTab = row.rfind('\t');
-      const auto prefix = row.substr(0, lastTab);
-      constexpr std::string_view progress = "\t-1\n";
-      const auto suffix = lastTab == std::string_view::npos ? std::string_view{} : progress;
-      if (prefix.size() + suffix.size() > cap - used) return used ? static_cast<int>(used) : DSN_ERR_TOO_BIG;
-      memcpy(out + used, prefix.data(), prefix.size());
-      used += prefix.size();
-      if (!suffix.empty()) {
-        memcpy(out + used, suffix.data(), suffix.size());
-        used += suffix.size();
+      // Match the firmware shelf ABI: path, title, author, progress,
+      // and an optional fifth field containing the formatted series/index.
+      size_t field = 0;
+      for (int i = 0; i < 3; ++i) {
+        field = row.find('\t', field);
+        if (field == std::string_view::npos) break;
+        ++field;
       }
+      if (field == std::string_view::npos) {
+        // Preserve malformed/blank shelf rows as empty records, so pagination
+        // keeps its existing record positions without exposing partial data.
+        if (used >= cap) return used ? static_cast<int>(used) : DSN_ERR_TOO_BIG;
+        out[used++] = '\n';
+        --count;
+        continue;
+      }
+      const std::string_view base = row.substr(0, field);
+      const size_t seriesTab = row.find('\t', field);
+      const std::string_view series = seriesTab == std::string_view::npos
+                                          ? std::string_view{} : row.substr(seriesTab, row.size() - seriesTab - 1);
+      constexpr std::string_view progress = "-1";
+      const size_t need = base.size() + progress.size() + series.size() + 1;
+      if (need > cap - used) return used ? static_cast<int>(used) : DSN_ERR_TOO_BIG;
+      memcpy(out + used, base.data(), base.size());
+      used += base.size();
+      memcpy(out + used, progress.data(), progress.size());
+      used += progress.size();
+      if (!series.empty()) {
+        memcpy(out + used, series.data(), series.size());
+        used += series.size();
+      }
+      out[used++] = '\n';
       --count;
     }
   }
@@ -329,8 +350,14 @@ int DesktopServices::bookProgress(const char* path) {
   std::string needle = std::string(path) + "\t";
   const size_t at = recentsFixture.find(needle);
   if (at == std::string::npos) return -1;
-  const size_t fields = recentsFixture.rfind('\t', recentsFixture.find('\n', at));
-  return fields == std::string::npos ? -1 : atoi(recentsFixture.c_str() + fields + 1);
+  // Progress is the fourth column even if the fifth series column exists.
+  size_t pos = at;
+  for (int i = 0; i < 3; ++i) {
+    pos = recentsFixture.find('\t', pos);
+    if (pos == std::string::npos) return -1;
+    ++pos;
+  }
+  return atoi(recentsFixture.c_str() + pos);
 }
 
 // ---- crypto ----

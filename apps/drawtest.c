@@ -23,6 +23,17 @@ int main(void) {
   unsigned m = dsn_measure_text("abcd", 4, DSN_FONT_BODY, 0);
   CHECK(2, lh > 0 && (int)(m & 0xffff) == lh && (m >> 16) > 0);
   CHECK(3, dsn_text_box(0, 100, w, 3 * lh, "wrapped and centred", 19, DSN_FONT_BODY, DSN_ALIGN_CENTER, 3, DSN_TEXT_BOLD) == 0);
+  const int largeH = dsn_line_height(DSN_FONT_LARGE);
+  CHECK(16, largeH > 0);
+  CHECK(17, dsn_text_box(0, 145, w, largeH, "Noto Sans 18", 12, DSN_FONT_LARGE, DSN_ALIGN_CENTER, 1, DSN_TEXT_BOLD) == 0);
+  const int fixedFonts[] = {DSN_FONT_NOTOSANS_12, DSN_FONT_NOTOSANS_14, DSN_FONT_NOTOSANS_18};
+  const char* labels[] = {"Fixed 12", "Fixed 14", "Fixed 18"};
+  for (int i = 0; i < 3; i++) {
+    int height = dsn_line_height(fixedFonts[i]);
+    unsigned size = dsn_measure_text(labels[i], 8, fixedFonts[i], DSN_TEXT_BOLD);
+    CHECK(18 + i, height > 0 && (int)(size & 0xffff) == height && (size >> 16) > 0);
+    CHECK(21 + i, dsn_text_box(0, 166 + 20 * i, w, height, labels[i], 8, fixedFonts[i], DSN_ALIGN_CENTER, 1, DSN_TEXT_BOLD) == 0);
+  }
   CHECK(4, dsn_text_box(0, h + 50, 0, 0, "off screen", 10, 0, 0, 1, 0) == -1);
   CHECK(5, dsn_text_box(0, 0, 0, 0, (const char *)0x7fffffff, 4, 0, 0, 1, 0) == -1); // bad pointer
 

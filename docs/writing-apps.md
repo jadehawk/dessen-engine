@@ -112,14 +112,23 @@ and a buttons-only one:
 
 - `CONFIRM` / `BACK` — the confirm/back keys (activate / go back).
 - `PREV` / `NEXT` — the up/down keys (and focus-prev/next). Use them to **move a
-  selection**, not to page.
+  selection**, not to page. The configured side page-turn keys set
+  `DSN_EV_SIDE_BUTTON` (bit 8), while preserving the same low-eight-bit event
+  type. Use this bit if front keys should control a widget and side keys should
+  still turn pages. Older apps that inspect only `DSN_EV_TYPE` work unchanged.
 - `TAP` / `LONG_PRESS` — a touch and a press-and-hold; both carry `x, y`
   (`DSN_EV_X/Y(e)`).
 - `SWIPE_UP` / `SWIPE_DOWN` / `SWIPE_LEFT` / `SWIPE_RIGHT` — the four touch
-  swipes (no coordinates). Use vertical swipes to **page/scroll**.
+  swipes. On firmware with swipe-origin support, they carry the gesture's **start**
+  `x, y` in the same safe-area coordinate system as taps. Apps can route swipes
+  to a widget by checking whether the start point falls inside its bounds.
+  Older firmware and synthetic swipes deliver `x=y=0`, so keep your widgets
+  away from `(0,0)` or provide a fallback. Use vertical swipes to **page/scroll**.
 
 A board with up/down keys *and* touch (most of them) delivers both, so these stay
-distinct: keys move the selection, a swipe pages, a tap opens. Always offer a
+distinct: keys move the selection, a swipe pages, a tap opens. The event type
+remains compatible with older Dessen binaries (the low eight bits are unchanged).
+Always offer a
 button path *and* a touch path (as the examples do) so your app is usable
 everywhere. Holding **Back** for one second always force-quits, so the user is
 never trapped.

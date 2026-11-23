@@ -1,6 +1,8 @@
 // Desktop runner for dessen apps: `dessen app.bin`. It uses the same FreeInk
 // binding as the firmware, with a draw target that prints each call. Keys on
-// stdin stand in for buttons: c confirm, b back, p prev, n next. Exits with
+// stdin stand in for buttons: c confirm, b back, p prev, n next;
+// L/R swipe in the lower card (400,380), l/r swipe above it (400,150).
+// u/d emulate the configured side page buttons. Exits with
 // the app's exit code, or 101 on a memory fault and 102 on an illegal instruction.
 #include <cstdio>
 #include <cstdlib>
@@ -33,11 +35,25 @@ int main(int argc, char** argv) {
   target.echo = true;
   freeink::ui::DeviceContext screen;
   screen.width = 800, screen.height = 480;
+  if (getenv("DESSEN_TEST_PORTRAIT")) { screen.width = 480; screen.height = 800; }
+  if (getenv("DESSEN_TEST_TOUCH")) screen.hasTouch = true;
+  if (getenv("DESSEN_TEST_SERIES")) {
+    const size_t at = services.recentsFixture.find("37\n");
+    if (at != std::string::npos) {
+      services.recentsFixture.replace(at, 3, "37\t#6 - Saga of the Forgotten Mountain\n");
+    }
+  }
+  if (getenv("DESSEN_TEST_ONE_BOOK")) {
+    const size_t first = services.recentsFixture.find('\n');
+    if (first != std::string::npos) services.recentsFixture.resize(first + 1);
+  }
   freeink::ui::InputSnapshot input;
+  dessen::FreeInkHost::Swipe gesture = dessen::FreeInkHost::SwipeNone;
   const clock_t t0 = clock();
   for (;;) {
-    const dessen::State state = host.step(target, screen, input, dessen::FreeInkHost::SwipeNone, 1000000);
+    const dessen::State state = host.step(target, screen, input, gesture, 1000000);
     input = {};
+    gesture = dessen::FreeInkHost::SwipeNone;
     if (host.takeRefreshRequest()) puts("refresh");
     if (state == dessen::State::Launch) {
       if (host.launch() == dessen::Launch::Home) {
@@ -56,6 +72,14 @@ int main(int argc, char** argv) {
     const int c = getchar();
     if (c == EOF) break;
     input.confirm = c == 'c', input.back = c == 'b', input.prev = c == 'p', input.next = c == 'n';
+    // u/d emulate the physical side page keys, p/n the four-key front row.
+    input.focusPrev = c == 'u';
+    input.focusNext = c == 'd';
+    if (c == 'L' || c == 'l' || c == 'R' || c == 'r') {
+      input.touchX = 400;
+      input.touchY = (c == 'L' || c == 'R') ? 380 : 150;
+      gesture = (c == 'L' || c == 'l') ? dessen::FreeInkHost::SwipeLeft : dessen::FreeInkHost::SwipeRight;
+    }
   }
   const double secs = static_cast<double>(clock() - t0) / CLOCKS_PER_SEC;
   fflush(stdout);

@@ -38,9 +38,10 @@ class FreeInkHost {
   //
   // The app's coordinate space is device.safeRect(): it cannot draw under a
   // bezel, and taps outside the safe area are not delivered.
-  // A touch swipe for this step. dessen carries it itself rather than on the
-  // shared InputSnapshot, since the SDK has no vertical-swipe field and nothing
-  // outside dessen needs one.
+  // A touch swipe for this step. On swipe ticks, input.touchX/touchY carry
+  // the panel-space gesture start point (or -1 when not available). The Dessen
+  // event encoder converts it into safe-area coordinates. This avoids adding
+  // a second gesture-position channel to the shared InputSnapshot.
   enum Swipe { SwipeNone = 0, SwipeUp, SwipeDown, SwipeLeft, SwipeRight };
   State step(freeink::ui::DrawTarget& target, const freeink::ui::DeviceContext& device,
              const freeink::ui::InputSnapshot& input, Swipe swipe = SwipeNone, uint32_t budget = 200000);

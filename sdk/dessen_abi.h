@@ -22,6 +22,12 @@
 #define DSN_FONT_SMALL 0
 #define DSN_FONT_BODY 1
 #define DSN_FONT_TITLE 2
+// Dedicated large Noto Sans 18 font on Razor-Crest Dessen hosts.
+#define DSN_FONT_LARGE 3
+// Stable fixed-size firmware font choices; the legacy font IDs above remain.
+#define DSN_FONT_NOTOSANS_12 4
+#define DSN_FONT_NOTOSANS_14 5
+#define DSN_FONT_NOTOSANS_18 6
 
 #define DSN_ALIGN_LEFT 0
 #define DSN_ALIGN_CENTER 1
@@ -55,16 +61,23 @@ typedef struct {
 } dsn_device_info;
 #endif
 
-// Events: type in the low 8 bits. A tap also carries x in bits 8-19 and y in
-// bits 20-31, in the same safe-area coordinates used for drawing. Apps get semantic actions, never raw device buttons, so one app
-// works on button-only and touch boards.
+// Events: type in the low 8 bits. Taps, long presses, and touch swipes carry
+// their START x in bits 8-19 and START y in bits 20-31, relative to the app's
+// safe-area origin. Apps may hit-test a swipe's start point to route gestures
+// to widgets. Legacy apps inspecting only DSN_EV_TYPE remain compatible.
+// Direction-only synthetic/older swipes have x=y=0 (the historical encoding);
+// apps should treat that as outside any widget whose bounds exclude (0,0).
+// Events are semantic actions rather than raw physical-button identities.
 #define DSN_EV_CONFIRM 1
 #define DSN_EV_BACK 2
 #define DSN_EV_PREV 3  // Up button / focus-prev
 #define DSN_EV_NEXT 4  // Down button / focus-next
+// Extra source marker on PREV/NEXT for configured side page-turn buttons.
+// The event type remains unchanged for legacy applications.
+#define DSN_EV_SIDE_BUTTON (1u << 8)
 #define DSN_EV_TAP 5         // carries x, y
 #define DSN_EV_LONG_PRESS 6  // press and hold; carries x, y like a tap
-#define DSN_EV_SWIPE_UP 7    // the four directional touch swipes (no coordinates)
+#define DSN_EV_SWIPE_UP 7    // touch swipe, optionally carries origin x/y
 #define DSN_EV_SWIPE_DOWN 8
 #define DSN_EV_SWIPE_LEFT 9
 #define DSN_EV_SWIPE_RIGHT 10

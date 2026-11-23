@@ -2,6 +2,7 @@
 // runner prints them; the tests assert on them.
 #pragma once
 #include <FreeInkUICore.h>
+#include "../sdk/dessen_abi.h"
 
 #include <cstdio>
 #include <string>
@@ -15,6 +16,8 @@ struct TraceTarget final : freeink::ui::DrawTarget {
   std::vector<std::string> ops;
   int lines = 0;
   bool echo = false;
+  bool largeFontSeen = false;
+  unsigned fixedFontsSeen = 0;
 
   void add(const std::string& op) {
     if (echo) puts(op.c_str());
@@ -38,7 +41,10 @@ struct TraceTarget final : freeink::ui::DrawTarget {
     if (echo) printf("line %d,%d - %d,%d\n", from.x, from.y, to.x, to.y);
   }
   void triangle(Point, Point, Point, Paint) override { add("triangle"); }
-  void text(Rect r, const char* text, freeink::ui::TextStyle) override {
+  void text(Rect r, const char* text, freeink::ui::TextStyle style) override {
+    if (style.font == DSN_FONT_LARGE) largeFontSeen = true;
+    if (style.font >= DSN_FONT_NOTOSANS_12 && style.font <= DSN_FONT_NOTOSANS_18)
+      fixedFontsSeen |= 1u << (style.font - DSN_FONT_NOTOSANS_12);
     add("text " + std::to_string(r.x) + "," + std::to_string(r.y) + " " + text);
   }
   void bitmap(Rect r, freeink::ui::BitmapRef b, freeink::ui::BitmapMode, Paint, freeink::ui::Rotation) override {

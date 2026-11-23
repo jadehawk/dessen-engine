@@ -391,10 +391,37 @@ int main(int argc, char** argv) {
   assert(host.load(mem, readApp(argv[6]), sizeof mem));
   target.ops.clear();
   target.lines = 0;
+  target.largeFontSeen = false;
+  target.fixedFontsSeen = 0;
   while (host.step(target, screen, none) == dessen::State::Running) {}
   assert(host.state() == dessen::State::Exited && host.exitCode() == 0);
   assert(shows("fill 10,10 50x30 c4") && shows("stroke 0,0 40x40 w3") && shows("triangle"));
   assert(shows("text 0,100 wrapped and centred") && shows("bitmap 200,10 8x8 src 8x8") && target.lines == 1);
+  assert(target.largeFontSeen && shows("text 0,145 Noto Sans 18"));
+  assert(target.fixedFontsSeen == 0x7 && shows("text 0,166 Fixed 12") && shows("text 0,186 Fixed 14") &&
+         shows("text 0,206 Fixed 18"));
+
+  // Front and side navigation share the legacy PREV/NEXT type, but side
+  // page keys carry a source bit so newer apps can distinguish both groups.
+  for (const auto& marker : {std::pair{true, DSN_EV_PREV}, std::pair{false, DSN_EV_NEXT}}) {
+    assert(host.load(mem, readApp(argv[1]), sizeof mem));
+    while (host.step(target, screen, none) == dessen::State::Running) {}
+    InputSnapshot side;
+    side.focusPrev = marker.first;
+    side.focusNext = !marker.first;
+    assert(host.step(target, screen, side) == dessen::State::Exited);
+    const uint32_t event = static_cast<uint32_t>(host.exitCode());
+    assert((event & 0xffu) == static_cast<uint32_t>(marker.second));
+    assert((event & DSN_EV_SIDE_BUTTON) != 0);
+
+    assert(host.load(mem, readApp(argv[1]), sizeof mem));
+    while (host.step(target, screen, none) == dessen::State::Running) {}
+    InputSnapshot front;
+    front.prev = marker.first;
+    front.next = !marker.first;
+    assert(host.step(target, screen, front) == dessen::State::Exited);
+    assert(host.exitCode() == marker.second);
+  }
 
   // Safe area: with bezel insets the app's (0,0) moves inside them, clear
   // still wipes the whole panel, and taps are reported in app coordinates.
@@ -414,6 +441,38 @@ int main(int argc, char** argv) {
   edge.touchY = 110;
   assert(host.step(target, bezel, edge) == dessen::State::Exited);
   assert(static_cast<uint32_t>(host.exitCode()) == (DSN_EV_TAP | 100u << 8 | 100u << 20));
+
+  // Swipe origins are delivered in the same safe-area coordinate system as
+  // taps, while synthetic swipes and off-safe-area starts retain the legacy
+  // direction-only encoding. Existing apps can continue checking type alone.
+  for (const auto& gesture : {std::pair{dessen::FreeInkHost::SwipeLeft, DSN_EV_SWIPE_LEFT},
+                              std::pair{dessen::FreeInkHost::SwipeRight, DSN_EV_SWIPE_RIGHT},
+                              std::pair{dessen::FreeInkHost::SwipeUp, DSN_EV_SWIPE_UP},
+                              std::pair{dessen::FreeInkHost::SwipeDown, DSN_EV_SWIPE_DOWN}}) {
+    assert(host.load(mem, readApp(argv[1]), sizeof mem));
+    while (host.step(target, bezel, none) == dessen::State::Running) {}
+    InputSnapshot start;
+    start.touchX = 140; // panel-space; safe-area point (100, 100)
+    start.touchY = 110;
+    assert(host.step(target, bezel, start, gesture.first) == dessen::State::Exited);
+    const uint32_t event = static_cast<uint32_t>(host.exitCode());
+    assert((event & 0xffu) == static_cast<uint32_t>(gesture.second));
+    assert(DSN_EV_X(event) == 100 && DSN_EV_Y(event) == 100);
+
+    assert(host.load(mem, readApp(argv[1]), sizeof mem));
+    while (host.step(target, bezel, none) == dessen::State::Running) {}
+    start.touchX = -1;
+    start.touchY = -1;
+    assert(host.step(target, bezel, start, gesture.first) == dessen::State::Exited);
+    assert(host.exitCode() == gesture.second);
+
+    assert(host.load(mem, readApp(argv[1]), sizeof mem));
+    while (host.step(target, bezel, none) == dessen::State::Running) {}
+    start.touchX = 5; // outside safe area
+    start.touchY = 5;
+    assert(host.step(target, bezel, start, gesture.first) == dessen::State::Exited);
+    assert(host.exitCode() == gesture.second);
+  }
 
   // drawtest again inside the bezel: it checks dsn_device() against dsn_screen().
   assert(host.load(mem, readApp(argv[6]), sizeof mem));
