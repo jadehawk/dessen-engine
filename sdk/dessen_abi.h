@@ -17,16 +17,16 @@
 #define DSN_BLACK 1
 #define DSN_LIGHT_GRAY 2
 #define DSN_DARK_GRAY 3
+#define DSN_SCRIM 4  // fill only: light-gray ink over what is there, the background left showing
 
 // Fonts are the firmware's own, so text matches the rest of the device.
 #define DSN_FONT_SMALL 0
 #define DSN_FONT_BODY 1
 #define DSN_FONT_TITLE 2
-// Dedicated large Noto Sans 18 font on Razor-Crest Dessen hosts.
-#define DSN_FONT_LARGE 3
-// Stable fixed-size firmware font choices; the legacy font IDs above remain.
-#define DSN_FONT_NOTOSANS_12 4
-#define DSN_FONT_NOTOSANS_14 5
+// Fixed font slots; the host may substitute an available size.
+#define DSN_FONT_NOTOSANS_12 3
+#define DSN_FONT_NOTOSANS_14 4
+#define DSN_FONT_NOTOSANS_16 5
 #define DSN_FONT_NOTOSANS_18 6
 
 #define DSN_ALIGN_LEFT 0
@@ -40,9 +40,10 @@
 
 #define DSN_CORNERS_ALL 15
 
-// 1-bit bitmaps, row-major, most significant bit first.
-#define DSN_BITMAP_MASK 0 // set bits are drawn in the given colour
-#define DSN_BITMAP_BW 1   // set bits black, clear bits white
+// 1-bit bitmaps, row-major, most significant bit first. Either way only the
+// ink pixels are drawn, in the given colour; the rest is left as it was.
+#define DSN_BITMAP_MASK 0 // clear bits are ink (the firmware's icon format)
+#define DSN_BITMAP_BW 1   // set bits are ink
 #define DSN_BITMAP_CENTER 0
 #define DSN_BITMAP_STRETCH 1
 
@@ -58,30 +59,33 @@ typedef struct {
   uint8_t has_touch, has_buttons;
   uint8_t orientation;              // 0 portrait, 1 landscape cw, 2 inverted, 3 landscape ccw
   uint8_t reserved;
+  // Height of the band along the bottom of the drawable area where the host
+  // draws button hints (dsn_button_hints), in pixels. 0: this device shows
+  // none (a touch board, no keys, or keys not along the bottom as it is
+  // turned), so the whole area is the app's.
+  uint16_t hint_height;
 } dsn_device_info;
 #endif
 
-// Events: type in the low 8 bits. Taps, long presses, and touch swipes carry
-// their START x in bits 8-19 and START y in bits 20-31, relative to the app's
-// safe-area origin. Apps may hit-test a swipe's start point to route gestures
-// to widgets. Legacy apps inspecting only DSN_EV_TYPE remain compatible.
-// Direction-only synthetic/older swipes have x=y=0 (the historical encoding);
-// apps should treat that as outside any widget whose bounds exclude (0,0).
-// Events are semantic actions rather than raw physical-button identities.
+// dsn_button_hints(): one line per action, in this order, '\n' between them.
+// An empty or missing line means no hint for that action.
+#define DSN_HINT_LABEL_MAX 32  // bytes per label
+// Events: type in the low 8 bits. A tap also carries x in bits 8-19 and y in
+// bits 20-31, in the same safe-area coordinates used for drawing. Apps get semantic actions, never raw device buttons, so one app
+// works on button-only and touch boards.
 #define DSN_EV_CONFIRM 1
 #define DSN_EV_BACK 2
-#define DSN_EV_PREV 3  // Up button / focus-prev
-#define DSN_EV_NEXT 4  // Down button / focus-next
-// Extra source marker on PREV/NEXT for configured side page-turn buttons.
-// The event type remains unchanged for legacy applications.
-#define DSN_EV_SIDE_BUTTON (1u << 8)
+#define DSN_EV_PREV 3  // previous action; side keys also carry DSN_EV_SIDE_BUTTON
+#define DSN_EV_NEXT 4  // next action; side keys also carry DSN_EV_SIDE_BUTTON
 #define DSN_EV_TAP 5         // carries x, y
 #define DSN_EV_LONG_PRESS 6  // press and hold; carries x, y like a tap
-#define DSN_EV_SWIPE_UP 7    // touch swipe, optionally carries origin x/y
+#define DSN_EV_SWIPE_UP 7    // touch swipe; may carry its safe-area origin x/y
 #define DSN_EV_SWIPE_DOWN 8
 #define DSN_EV_SWIPE_LEFT 9
 #define DSN_EV_SWIPE_RIGHT 10
-#define DSN_EV_TIMER 11  // periodic host wake for background pairing checks; no user input
+// On PREV/NEXT: identifies configured side page-turn keys; front keys are unmarked.
+#define DSN_EV_SIDE_BUTTON 0x100u
+#define DSN_EV_TIMER 11  // opt-in periodic wake; no coordinates
 #define DSN_EV_TYPE(e) ((e) & 0xff)
 #define DSN_EV_X(e) (((e) >> 8) & 0xfff)
 #define DSN_EV_Y(e) (((e) >> 20) & 0xfff)

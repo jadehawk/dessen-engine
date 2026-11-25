@@ -32,12 +32,26 @@ int main(int argc, char** argv) {
   dessen::DesktopServices services(fsRoot ? fsRoot : "", appDir ? appDir : "/app", netRoot ? netRoot : "");
   host.setServices(&services);
 
+  // Test-only paint above the ELF's BSS; measure the deepest actual stack writes.
+  const char* stackEnv = getenv("DESSEN_TEST_STACK_START");
+  const uint32_t stackStart = stackEnv ? static_cast<uint32_t>(strtoul(stackEnv, nullptr, 0)) : 0;
+  const uint32_t stackTop = host.vm().mem_size;
+  if (stackEnv && (stackStart < len || stackStart >= stackTop)) return 2;
+  if (stackEnv) for (uint32_t i = stackStart; i < stackTop; ++i) mem[i] = 0xa5;
+
   TraceTarget target;
   target.echo = true;
   freeink::ui::DeviceContext screen;
   screen.width = 800, screen.height = 480;
   if (getenv("DESSEN_TEST_PORTRAIT")) { screen.width = 480; screen.height = 800; }
+  if (getenv("DESSEN_TEST_X3")) { screen.width = 528; screen.height = 792; target.x3Metrics = true; }
+  if (getenv("DESSEN_TEST_NARROW")) {
+    screen.width = 480; screen.height = 800;
+    target.narrowMetrics = true;
+    target.wrapMetrics = getenv("DESSEN_TEST_WRAP") != nullptr;
+  }
   if (getenv("DESSEN_TEST_TOUCH")) screen.hasTouch = true;
+  if (!screen.hasTouch && getenv("DESSEN_TEST_HINTS")) services.hintHeight = 36;
   if (getenv("DESSEN_TEST_SERIES")) {
     const size_t at = services.recentsFixture.find("37\n");
     if (at != std::string::npos) {
@@ -60,10 +74,7 @@ int main(int argc, char** argv) {
       if (host.launch() == dessen::Launch::Home) {
         printf("[launch home %d]\n", host.launchHomeDest());
       } else {
-        const char* k = host.launch() == dessen::Launch::NativeStatsPair ? "stats-pair"
-                        : host.launch() == dessen::Launch::NativeStatsRefresh ? "stats-refresh"
-                         : host.launch() == dessen::Launch::NativeStatsUnpair ? "stats-unpair"
-                        : host.launch() == dessen::Launch::Reader     ? "reader"
+        const char* k = host.launch() == dessen::Launch::Reader ? "reader"
                         : host.launch() == dessen::Launch::Settings ? "settings"
                         : host.launch() == dessen::Launch::App      ? "app"
                                                                     : "browser";
@@ -99,10 +110,21 @@ int main(int argc, char** argv) {
   fflush(stdout);
   fprintf(stderr, "%llu instructions, %.3fs\n", static_cast<unsigned long long>(host.vm().icount), secs);
 
+  if (stackEnv) {
+    uint32_t low = stackStart;
+    while (low < stackTop && mem[low] == 0xa5) ++low;
+    fprintf(stderr, "STACK headroom=%u used=%u\n", low - stackStart, stackTop - low);
+    if (low - stackStart < 1024) return 104;
+  }
   if (host.state() == dessen::State::Faulted) {
     const bool mem_fault = host.vm().fault_addr != host.vm().pc;
     fprintf(stderr, "FAULT at 0x%08x (pc 0x%08x)\n", host.vm().fault_addr, host.vm().pc);
     return mem_fault ? 101 : 102;
   }
-  return host.state() == dessen::State::Exited ? host.exitCode() & 0xff : 0;
+  if (host.state() == dessen::State::Exited && host.exitCode() != 0) {
+    fprintf(stderr, "GUEST EXIT %d\n", host.exitCode());
+    const int code = host.exitCode() & 0xff;
+    return code ? code : 1;
+  }
+  return 0;
 }

@@ -77,6 +77,62 @@ static void testAsync(const char* appPath) {
   assert(net.polls >= 3);
 }
 
+
+static void testContinuation(const char* appPath) {
+  FILE* file = fopen(appPath, "rb");
+  assert(file);
+  const uint32_t n = static_cast<uint32_t>(fread(mem2, 1, sizeof mem2, file));
+  fclose(file);
+  std::vector<uint8_t> image(mem2, mem2 + n);
+  ParkingNet network;
+  dessen::FreeInkHost original;
+  assert(original.load(mem2, n, sizeof mem2));
+  dessen::FreeInkHost::Continuation saved;
+  assert(!original.saveContinuation(saved));
+  assert(original.setTimerInterval(999) == DSN_ERR_INVALID);
+  assert(original.setTimerInterval(3600001) == DSN_ERR_INVALID);
+  assert(original.setTimerInterval(5000) == 0);
+  original.setServices(&network);
+  TraceTarget target;
+  DeviceContext device;
+  device.width = 400;
+  device.height = 300;
+  InputSnapshot none;
+  while (original.step(target, device, none) == dessen::State::Running) {}
+  assert(original.state() == dessen::State::Busy);
+  assert(original.saveContinuation(saved));
+  assert(saved.timerInterval == 5000);
+  const auto offset = static_cast<uint32_t>(network.resp - mem2);
+  std::vector<uint8_t> snapshot(mem2, mem2 + saved.memorySize);
+  assert(original.detachMemory());
+  dessen::FreeInkHost resumed;
+  memcpy(mem, image.data(), n);
+  assert(resumed.load(mem, n, sizeof mem));
+  auto invalid = saved;
+  invalid.memorySize++;
+  assert(!resumed.resumeContinuation(invalid, 5));
+  invalid = saved;
+  invalid.pc = saved.memorySize;
+  assert(!resumed.resumeContinuation(invalid, 5));
+  memcpy(mem, snapshot.data(), snapshot.size());
+  const uint8_t response[] = {0, 200, 0, 0, 'r', 'e', 'a', 'd', 'y'};
+  assert(offset <= saved.memorySize && sizeof(response) <= saved.memorySize - offset);
+  memcpy(mem + offset, response, sizeof(response));
+  assert(resumed.resumeContinuation(saved, 5));
+  assert(resumed.timerInterval() == 5000);
+  assert(resumed.vm().x[0] == 0 && resumed.vm().pc == saved.pc);
+  for (int i = 0; i < 100 && resumed.state() == dessen::State::Running; ++i)
+    resumed.step(target, device, none);
+  assert(resumed.state() == dessen::State::Exited && resumed.exitCode() == 0);
+  // Failure and cancellation use the same continuation without a live service.
+  memcpy(mem, image.data(), n);
+  assert(resumed.load(mem, n, sizeof mem));
+  memcpy(mem, snapshot.data(), snapshot.size());
+  assert(resumed.resumeContinuation(saved, DSN_ERR_IO));
+  assert(static_cast<int32_t>(resumed.vm().x[10]) == DSN_ERR_IO);
+  assert(resumed.setTimerInterval(0) == 0 && resumed.timerInterval() == 0);
+}
+
 // Round-trips a PKCS#12 through DesktopServices::pkcs12Parse and checks the blob
 // layout (u16 key length, PKCS#8 key DER, X.509 cert DER).
 static void testPkcs12() {
@@ -396,15 +452,13 @@ int main(int argc, char** argv) {
   assert(host.load(mem, readApp(argv[6]), sizeof mem));
   target.ops.clear();
   target.lines = 0;
-  target.largeFontSeen = false;
   target.fixedFontsSeen = 0;
   while (host.step(target, screen, none) == dessen::State::Running) {}
   assert(host.state() == dessen::State::Exited && host.exitCode() == 0);
   assert(shows("fill 10,10 50x30 c4") && shows("stroke 0,0 40x40 w3") && shows("triangle"));
   assert(shows("text 0,100 wrapped and centred") && shows("bitmap 200,10 8x8 src 8x8") && target.lines == 1);
-  assert(target.largeFontSeen && shows("text 0,145 Noto Sans 18"));
-  assert(target.fixedFontsSeen == 0x7 && shows("text 0,166 Fixed 12") && shows("text 0,186 Fixed 14") &&
-         shows("text 0,206 Fixed 18"));
+  assert(target.fixedFontsSeen == 0xf && shows("text 0,166 Fixed 12") && shows("text 0,186 Fixed 14") &&
+         shows("text 0,206 Fixed 16") && shows("text 0,226 Fixed 18"));
 
   // Front and side navigation share the legacy PREV/NEXT type, but side
   // page keys carry a source bit so newer apps can distinguish both groups.
@@ -484,10 +538,30 @@ int main(int argc, char** argv) {
   while (host.step(target, bezel, none) == dessen::State::Running) {}
   assert(host.state() == dessen::State::Exited && host.exitCode() == 0);
 
+  // Native theme hints reserve only the part of the band inside the safe area.
+  {
+    dessen::DesktopServices hints("");
+    hints.hintHeight = 40;
+    host.setServices(&hints);
+    assert(host.load(mem, readApp(argv[6]), sizeof mem));
+    target.ops.clear();
+    while (host.step(target, bezel, none) == dessen::State::Running) {}
+    assert(host.state() == dessen::State::Exited && host.exitCode() == 0);
+    assert(shows("stroke 0,760 120x40 w1") && shows("stroke 120,760 120x40 w1"));
+    assert(!shows("stroke 240,760") && shows("stroke 360,760 120x40 w1"));
+    hints.hintHeight = 0;
+    assert(host.load(mem, readApp(argv[6]), sizeof mem));
+    target.ops.clear();
+    while (host.step(target, bezel, none) == dessen::State::Running) {}
+    assert(host.exitCode() == 0 && !shows("stroke 0,760"));
+    host.setServices(nullptr);
+  }
+
   // A truncated or garbage image is rejected.
   mem[0] ^= 0xff;
   assert(!host.load(mem, 16, sizeof mem));
 
+  testContinuation(argv[7]);
   testAsync(argv[7]); // kBusy parking/poll path
   testPkcs12();       // PKCS#12 parse + blob layout
   testDesktopStorage();

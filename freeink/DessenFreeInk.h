@@ -21,7 +21,7 @@ enum class State : uint8_t {
 
 // What a launcher/home app asked the host to open (see State::Launch). The host
 // opens the screen and tears the app down; the app does not resume.
-enum class Launch : uint8_t { None, Reader, Settings, Browser, Home, App, NativeStatsPair, NativeStatsRefresh, NativeStatsUnpair };
+enum class Launch : uint8_t { None, Reader, Settings, Browser, Home, App };
 
 class Services;
 
@@ -38,10 +38,9 @@ class FreeInkHost {
   //
   // The app's coordinate space is device.safeRect(): it cannot draw under a
   // bezel, and taps outside the safe area are not delivered.
-  // A touch swipe for this step. On swipe ticks, input.touchX/touchY carry
-  // the panel-space gesture start point (or -1 when not available). The Dessen
-  // event encoder converts it into safe-area coordinates. This avoids adding
-  // a second gesture-position channel to the shared InputSnapshot.
+  // A touch swipe for this step. dessen carries it itself rather than on the
+  // shared InputSnapshot, since the SDK has no vertical-swipe field and nothing
+  // outside dessen needs one.
   enum Swipe { SwipeNone = 0, SwipeUp, SwipeDown, SwipeLeft, SwipeRight, WakeTick };
   State step(freeink::ui::DrawTarget& target, const freeink::ui::DeviceContext& device,
              const freeink::ui::InputSnapshot& input, Swipe swipe = SwipeNone, uint32_t budget = 200000);
@@ -66,6 +65,8 @@ class FreeInkHost {
   int beginWifi();
   int requestLaunch(int kind, const uint8_t* path, uint32_t pathLen); // open_book/settings/browser
   int requestLaunchHome(int dest);                                   // open_home
+  int setClip(int32_t x, int32_t y, int32_t w, int32_t h);           // set_clip
+  int buttonHints(const uint8_t* labels, uint32_t len);              // button_hints
   Services* services() const { return services_; }
 
   // After step() returns State::Launch, what the app asked to open and (for the
@@ -80,6 +81,28 @@ class FreeInkHost {
     refresh_ = false;
     return r;
   }
+  // The caller may release guest RAM only while an asynchronous syscall is parked.
+  bool detachMemory() {
+    if (state_ != State::Busy || !vm_.mem) return false;
+    vm_.mem = nullptr;
+    return true;
+  }
+  bool attachMemory(uint8_t* mem, uint32_t size) {
+    if (state_ != State::Busy || vm_.mem || !mem || size != vm_.mem_size) return false;
+    vm_.mem = mem;
+    return true;
+  }
+  struct Continuation {
+    uint32_t registers[32]{};
+    uint32_t pc = 0, memorySize = 0, timerInterval = 0;
+    uint64_t instructions = 0;
+    freeink::ui::Rect clip{};
+    bool clipped = false;
+  };
+  int setTimerInterval(uint32_t interval);
+  uint32_t timerInterval() const { return timerInterval_; }
+  bool saveContinuation(Continuation& out) const;
+  bool resumeContinuation(const Continuation& saved, int result);
   State state() const { return state_; }
   int exitCode() const { return static_cast<int>(vm_.x[10]); }
   const dvm_t& vm() const { return vm_; } // fault_addr, pc, icount for diagnostics
@@ -91,6 +114,7 @@ class FreeInkHost {
   dvm_t vm_{};
   State state_ = State::Exited;
   bool refresh_ = false;
+  uint32_t timerInterval_ = 0;
   uint32_t (*random_)() = nullptr;
   uint32_t fallbackSeed_ = 0x9e3779b9u;
   Services* services_ = nullptr;
@@ -99,6 +123,10 @@ class FreeInkHost {
   int launchHomeDest_ = 0;
   freeink::ui::DrawTarget* target_ = nullptr;
   freeink::ui::DeviceContext device_{};
+  freeink::ui::Rect clip_{};      // the app's clip, panel coordinates
+  freeink::ui::Rect outerClip_{}; // the firmware's, restored after each step
+  bool clipped_ = false;
+  bool clipTouched_ = false;
 
  public:
   void randomBytesInto(uint8_t* out, uint32_t n); // fills from service or fallback

@@ -23,7 +23,7 @@
 2  refresh()                  : self.refresh_ = true; return kYield;
 3  screen() -> u32            : result = static_cast<uint32_t>(screen.width) << 16 | static_cast<uint16_t>(screen.height);
 4  random() -> u32            : result = self.nextRandom();
-5  device(out info) -> u32    : result = writeDeviceInfo(self.device_, screen, info, info_len);
+5  device(out info) -> u32    : result = writeDeviceInfo(self.device_, screen, self.services() ? self.services()->buttonHintsHeight() : 0, info, info_len);
 
 # --- freeink::ui::DrawTarget (16-31) ---
 16 clear()                    : target.fill(self.device_.screen(), Paint::solid(Color::White));
@@ -36,6 +36,14 @@
 23 measure_text(str s, u8 font, u8 flags) -> u32 : { const TextStyle st = textStyle(font, 0, 1, flags); const Size m = target.measureText(st.font, s, st); result = static_cast<uint32_t>(static_cast<uint16_t>(m.width)) << 16 | static_cast<uint16_t>(m.height); }
 24 line_height(u8 font) -> i32 : result = static_cast<uint32_t>(target.lineHeight(textStyle(font, 0, 1, 0).font));
 25 bitmap(i16 x, i16 y, i16 w, i16 h, buf data, u16 bw, u16 bh, u8 format, u8 mode, u8 color, u8 rotation) -> i32 : result = drawBitmap(target, screen, x, y, w, h, data, data_len, bw, bh, format, mode, color, rotation);
+# set_clip limits every later draw to a rectangle of the safe area, until the
+# next set_clip; a negative width lifts it. The firmware's own clip is restored
+# whenever the app stops running, so the app's never reaches firmware drawing.
+26 set_clip(i16 x, i16 y, i16 w, i16 h) -> i32 : result = self.setClip(x, y, w, h);
+# button_hints: the host draws its own hints, in its own look, over its keys;
+# labels are back, confirm, previous, next, one per line. dsn_device's
+# hint_height says whether it will (0: it ignores this) and how much to leave.
+27 button_hints(buf labels) -> i32 : result = self.buttonHints(labels, labels_len);
 
 # ==== Capabilities (see docs/proposed-capabilities.md). Each host statement
 # ==== sanitizes app input, then calls a Services method; async calls return a
@@ -95,6 +103,5 @@
 101 open_home(u8 dest) -> i32   : return self.requestLaunchHome((int)dest);
 103 wifi_connect() -> i32 : return self.beginWifi();
 105 book_cover(buf path, u16 height, out pixels) -> i32 : result = svcBookCover(self, path, path_len, height, pixels, pixels_len);
+107 timer_set(u32 interval_ms) -> i32 : result = self.setTimerInterval(interval_ms);
 106 qr_bitmap(buf link, out pixels) -> i32 : result = self.services() ? self.services()->qrBitmap(reinterpret_cast<const char*>(link), link_len, pixels, pixels_len) : DSN_ERR_UNAVAILABLE;
-107 native_stats_mode() -> i32 : result = self.services() ? self.services()->nativeStatsMode() : 0;
-108 native_stats(u8 action) -> i32 : return self.requestLaunch(action == 0 ? 5 : action == 1 ? 6 : action == 2 ? 7 : 0, 0, 0);

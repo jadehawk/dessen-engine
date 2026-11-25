@@ -22,6 +22,9 @@ class DesktopServices : public Services {
   bool randomBytes(uint8_t* out, uint32_t n) override;
   int deviceId(char* out, uint32_t cap) override;
   int locale(char* out, uint32_t cap) override;
+  int hintHeight = 0;
+  int buttonHintsHeight() override { return hintHeight; }
+  void drawButtonHints(freeink::ui::DrawTarget&, const freeink::ui::Rect&, const char* const[4]) override;
   // storage
   int fsRead(const char* path, uint8_t* out, uint32_t cap) override;
   int fsReadAt(const char* path, uint32_t offset, uint8_t* out, uint32_t cap) override;
@@ -35,7 +38,6 @@ class DesktopServices : public Services {
   int recentShelf(uint32_t first, uint32_t count, char* out, uint32_t cap) override;
   int bookCover(const char*, uint32_t, uint8_t*, uint32_t) override { return 0; }  // desktop has no covers
   int bookProgress(const char* path) override;
-  int nativeStatsMode() override { return std::getenv("DESSEN_NATIVE_STATS") ? 1 : 0; }
   // crypto
   int hash(int algo, const uint8_t* data, uint32_t n, uint8_t* out, uint32_t cap) override;
   int aesCbc(int flags, const uint8_t* keyiv, const uint8_t* data, uint32_t n, uint8_t* out, uint32_t cap) override;

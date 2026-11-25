@@ -21,7 +21,26 @@
 
 #include "../sdk/dessen_abi.h"
 
+#include <FreeInkUICore.h>
+
 namespace dessen {
+void DesktopServices::drawButtonHints(freeink::ui::DrawTarget& target, const freeink::ui::Rect& band,
+                                      const char* const labels[4]) {
+  using namespace freeink::ui;
+  for (int i = 0; i < 4; ++i) {
+    if (!labels[i][0]) continue;
+    const int16_t left = static_cast<int16_t>(band.x + i * band.width / 4);
+    const int16_t right = static_cast<int16_t>(band.x + (i + 1) * band.width / 4);
+    const Rect box{left, band.y, static_cast<int16_t>(right - left), band.height};
+    target.stroke(box, Paint::solid(Color::Black), 1, 0, 0);
+    TextStyle style;
+    style.font = DSN_FONT_SMALL;
+    style.align = TextAlign::Center;
+    const int16_t line = target.lineHeight(style.font);
+    target.text(Rect{box.x, static_cast<int16_t>(box.y + (box.height - line) / 2), box.width, line}, labels[i], style);
+  }
+}
+
 namespace {
 
 // A completed crypto result goes into the app buffer with this guard.
@@ -162,9 +181,10 @@ DesktopServices::DesktopServices(std::string fsRoot, std::string appDir, std::st
     : fsRoot_(std::move(fsRoot)), appDir_(std::move(appDir)), netRoot_(std::move(netRoot)) {}
 
 // ---- core ----
-uint32_t DesktopServices::timeNow() { return static_cast<uint32_t>(::time(nullptr)); }
+uint32_t DesktopServices::timeNow() { return std::getenv("DESSEN_TEST_NO_TIME") ? 0 : static_cast<uint32_t>(::time(nullptr)); }
 
 int DesktopServices::clock(uint8_t* out) {
+  if (std::getenv("DESSEN_TEST_NO_CLOCK") || std::getenv("DESSEN_TEST_NO_TIME")) return DSN_ERR_UNAVAILABLE;
   const time_t now = ::time(nullptr);
   struct tm t;
   localtime_r(&now, &t);

@@ -16,7 +16,6 @@ struct TraceTarget final : freeink::ui::DrawTarget {
   std::vector<std::string> ops;
   int lines = 0;
   bool echo = false;
-  bool largeFontSeen = false;
   unsigned fixedFontsSeen = 0;
 
   void add(const std::string& op) {
@@ -27,10 +26,14 @@ struct TraceTarget final : freeink::ui::DrawTarget {
     return std::to_string(r.x) + "," + std::to_string(r.y) + " " + std::to_string(r.width) + "x" + std::to_string(r.height);
   }
 
-  freeink::ui::Size measureText(freeink::ui::FontId, const char* text, freeink::ui::TextStyle) const override {
-    return freeink::ui::Size{static_cast<int16_t>(8 * strlen(text)), 16};
+  bool x3Metrics = false;
+  bool narrowMetrics = false;
+  bool wrapMetrics = false;
+  freeink::ui::Size measureText(freeink::ui::FontId font, const char* text, freeink::ui::TextStyle) const override {
+    const int charWidth = narrowMetrics ? (font == 0 && !wrapMetrics ? 10 : 15) : (x3Metrics ? lineHeight(font) / 2 : 8);
+    return freeink::ui::Size{static_cast<int16_t>(charWidth * strlen(text)), lineHeight(font)};
   }
-  int16_t lineHeight(freeink::ui::FontId) const override { return 16; }
+  int16_t lineHeight(freeink::ui::FontId font) const override { return narrowMetrics ? (font >= 5 ? 27 : 22) : x3Metrics ? (font >= 6 ? 27 : font >= 4 ? 22 : 18) : 16; }
   Rect clip_{0, 0, 32767, 32767};
   Rect clipRect() const override { return clip_; }
   bool setClipRect(Rect r) override { clip_ = r; add("clip " + at(r)); return true; }
@@ -42,9 +45,17 @@ struct TraceTarget final : freeink::ui::DrawTarget {
   }
   void triangle(Point, Point, Point, Paint) override { add("triangle"); }
   void text(Rect r, const char* text, freeink::ui::TextStyle style) override {
-    if (style.font == DSN_FONT_LARGE) largeFontSeen = true;
-    if (style.font >= DSN_FONT_NOTOSANS_12 && style.font <= DSN_FONT_NOTOSANS_18)
-      fixedFontsSeen |= 1u << (style.font - DSN_FONT_NOTOSANS_12);
+    if (narrowMetrics && (strcmp(text, "Reading Time") == 0 || strcmp(text, "Avg. Session") == 0)) {
+      std::string joined;
+      freeink::ui::layoutText(*this, r, text, style, [&](const char* line, Rect run) {
+        if (!joined.empty()) joined += ' ';
+        joined += line;
+        if (run.y + lineHeight(style.font) > r.y + r.height) joined += " [overflow]";
+      });
+      printf("metric-fit %s %s %d %d %d %d\n", joined == text ? "ok" : "FAIL", text, r.x, r.y, r.width, r.height);
+    }
+    if (style.font >= 4 && style.font <= 7)
+      fixedFontsSeen |= 1u << (style.font - 4);
     add("text " + std::to_string(r.x) + "," + std::to_string(r.y) + " " + text);
   }
   void bitmap(Rect r, freeink::ui::BitmapRef b, freeink::ui::BitmapMode, Paint, freeink::ui::Rotation) override {

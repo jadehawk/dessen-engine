@@ -88,6 +88,8 @@ static inline int dsn_text_box(int x, int y, int w, int h, const char *s, int s_
 static inline unsigned dsn_measure_text(const char *s, int s_len, int font, int flags) { return (unsigned)dsn_call3(DSN_SYS_MEASURE_TEXT, (long)s, s_len, (long)(((unsigned)font & 0xff) | ((unsigned)flags & 0xff) << 8)); }
 static inline int dsn_line_height(int font) { return (int)dsn_call1(DSN_SYS_LINE_HEIGHT, (long)(((unsigned)font & 0xff))); }
 static inline int dsn_bitmap(int x, int y, int w, int h, const void *data, int data_len, int bw, int bh, int format, int mode, int color, int rotation) { return (int)dsn_call6(DSN_SYS_BITMAP, (long)(((unsigned)x & 0xffff) | ((unsigned)y & 0xffff) << 16), (long)(((unsigned)w & 0xffff) | ((unsigned)h & 0xffff) << 16), (long)data, data_len, (long)(((unsigned)bw & 0xffff) | ((unsigned)bh & 0xffff) << 16), (long)(((unsigned)format & 0xff) | ((unsigned)mode & 0xff) << 8 | ((unsigned)color & 0xff) << 16 | ((unsigned)rotation & 0xff) << 24)); }
+static inline int dsn_set_clip(int x, int y, int w, int h) { return (int)dsn_call2(DSN_SYS_SET_CLIP, (long)(((unsigned)x & 0xffff) | ((unsigned)y & 0xffff) << 16), (long)(((unsigned)w & 0xffff) | ((unsigned)h & 0xffff) << 16)); }
+static inline int dsn_button_hints(const void *labels, int labels_len) { return (int)dsn_call2(DSN_SYS_BUTTON_HINTS, (long)labels, labels_len); }
 static inline unsigned dsn_time(void) { return (unsigned)dsn_call0(DSN_SYS_TIME); }
 static inline int dsn_device_id(void *id, int id_len) { return (int)dsn_call2(DSN_SYS_DEVICE_ID, (long)id, id_len); }
 static inline int dsn_clock(void *t, int t_len) { return (int)dsn_call2(DSN_SYS_CLOCK, (long)t, t_len); }
@@ -125,6 +127,5 @@ static inline int dsn_book_progress(const void *path, int path_len) { return (in
 static inline int dsn_open_home(int dest) { return (int)dsn_call1(DSN_SYS_OPEN_HOME, (long)(((unsigned)dest & 0xff))); }
 static inline int dsn_wifi_connect(void) { return (int)dsn_call0(DSN_SYS_WIFI_CONNECT); }
 static inline int dsn_book_cover(const void *path, int path_len, int height, void *pixels, int pixels_len) { return (int)dsn_call5(DSN_SYS_BOOK_COVER, (long)path, path_len, (long)(((unsigned)height & 0xffff)), (long)pixels, pixels_len); }
+static inline int dsn_timer_set(unsigned interval_ms) { return (int)dsn_call1(DSN_SYS_TIMER_SET, (long)interval_ms); }
 static inline int dsn_qr_bitmap(const void *link, int link_len, void *pixels, int pixels_len) { return (int)dsn_call4(DSN_SYS_QR_BITMAP, (long)link, link_len, (long)pixels, pixels_len); }
-static inline int dsn_native_stats_mode(void) { return (int)dsn_call0(DSN_SYS_NATIVE_STATS_MODE); }
-static inline int dsn_native_stats(int action) { return (int)dsn_call1(DSN_SYS_NATIVE_STATS, (long)(((unsigned)action & 0xff))); }

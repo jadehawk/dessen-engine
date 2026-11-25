@@ -13,6 +13,11 @@ int main(void) {
   dsn_device_info d;
   CHECK(10, dsn_device(&d, sizeof d) == sizeof d && d.width == w && d.height == h);
   CHECK(11, d.panel_width == w + d.inset_left + d.inset_right && d.panel_height == h + d.inset_top + d.inset_bottom);
+  CHECK(24, dsn_button_hints("Back\nOpen\n\nNext", 15) == 0);
+  CHECK(25, dsn_button_hints("a\nb\nc\nd\ne", 9) == DSN_ERR_INVALID);
+  CHECK(26, dsn_button_hints("bad\tlabel", 9) == DSN_ERR_INVALID);
+  CHECK(27, dsn_button_hints("123456789012345678901234567890123", 33) == DSN_ERR_INVALID);
+  CHECK(28, dsn_button_hints((const void*)0x7fffffff, 4) == DSN_ERR_INVALID);
   dsn_clear();
   dsn_fill_round(10, 10, 50, 30, DSN_BLACK, 6, DSN_CORNERS_ALL);
   dsn_stroke(-20, -20, 60, 60, DSN_BLACK, 3, 0, DSN_CORNERS_ALL); // partly off screen: clipped
@@ -23,12 +28,9 @@ int main(void) {
   unsigned m = dsn_measure_text("abcd", 4, DSN_FONT_BODY, 0);
   CHECK(2, lh > 0 && (int)(m & 0xffff) == lh && (m >> 16) > 0);
   CHECK(3, dsn_text_box(0, 100, w, 3 * lh, "wrapped and centred", 19, DSN_FONT_BODY, DSN_ALIGN_CENTER, 3, DSN_TEXT_BOLD) == 0);
-  const int largeH = dsn_line_height(DSN_FONT_LARGE);
-  CHECK(16, largeH > 0);
-  CHECK(17, dsn_text_box(0, 145, w, largeH, "Noto Sans 18", 12, DSN_FONT_LARGE, DSN_ALIGN_CENTER, 1, DSN_TEXT_BOLD) == 0);
-  const int fixedFonts[] = {DSN_FONT_NOTOSANS_12, DSN_FONT_NOTOSANS_14, DSN_FONT_NOTOSANS_18};
-  const char* labels[] = {"Fixed 12", "Fixed 14", "Fixed 18"};
-  for (int i = 0; i < 3; i++) {
+  const int fixedFonts[] = {DSN_FONT_NOTOSANS_12, DSN_FONT_NOTOSANS_14, DSN_FONT_NOTOSANS_16, DSN_FONT_NOTOSANS_18};
+  const char* labels[] = {"Fixed 12", "Fixed 14", "Fixed 16", "Fixed 18"};
+  for (int i = 0; i < 4; i++) {
     int height = dsn_line_height(fixedFonts[i]);
     unsigned size = dsn_measure_text(labels[i], 8, fixedFonts[i], DSN_TEXT_BOLD);
     CHECK(18 + i, height > 0 && (int)(size & 0xffff) == height && (size >> 16) > 0);

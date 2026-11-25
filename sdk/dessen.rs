@@ -17,6 +17,8 @@ pub const DSN_SYS_TEXT_BOX: usize = 22;
 pub const DSN_SYS_MEASURE_TEXT: usize = 23;
 pub const DSN_SYS_LINE_HEIGHT: usize = 24;
 pub const DSN_SYS_BITMAP: usize = 25;
+pub const DSN_SYS_SET_CLIP: usize = 26;
+pub const DSN_SYS_BUTTON_HINTS: usize = 27;
 pub const DSN_SYS_TIME: usize = 32;
 pub const DSN_SYS_DEVICE_ID: usize = 33;
 pub const DSN_SYS_CLOCK: usize = 35;
@@ -54,9 +56,8 @@ pub const DSN_SYS_BOOK_PROGRESS: usize = 100;
 pub const DSN_SYS_OPEN_HOME: usize = 101;
 pub const DSN_SYS_WIFI_CONNECT: usize = 103;
 pub const DSN_SYS_BOOK_COVER: usize = 105;
+pub const DSN_SYS_TIMER_SET: usize = 107;
 pub const DSN_SYS_QR_BITMAP: usize = 106;
-pub const DSN_SYS_NATIVE_STATS_MODE: usize = 107;
-pub const DSN_SYS_NATIVE_STATS: usize = 108;
 
 #[inline]
 unsafe fn dsn_call0(n: usize) -> i32 {
@@ -201,6 +202,10 @@ pub fn dsn_line_height(font: i32) -> i32 { unsafe { dsn_call1(DSN_SYS_LINE_HEIGH
 #[inline]
 pub fn dsn_bitmap(x: i32, y: i32, w: i32, h: i32, data: &[u8], bw: i32, bh: i32, format: i32, mode: i32, color: i32, rotation: i32) -> i32 { unsafe { dsn_call6(DSN_SYS_BITMAP, ((x as u32 & 0xffff) | ((y as u32 & 0xffff) << 16)) as usize, ((w as u32 & 0xffff) | ((h as u32 & 0xffff) << 16)) as usize, data.as_ptr() as usize, data.len(), ((bw as u32 & 0xffff) | ((bh as u32 & 0xffff) << 16)) as usize, ((format as u32 & 0xff) | ((mode as u32 & 0xff) << 8) | ((color as u32 & 0xff) << 16) | ((rotation as u32 & 0xff) << 24)) as usize) } }
 #[inline]
+pub fn dsn_set_clip(x: i32, y: i32, w: i32, h: i32) -> i32 { unsafe { dsn_call2(DSN_SYS_SET_CLIP, ((x as u32 & 0xffff) | ((y as u32 & 0xffff) << 16)) as usize, ((w as u32 & 0xffff) | ((h as u32 & 0xffff) << 16)) as usize) } }
+#[inline]
+pub fn dsn_button_hints(labels: &[u8]) -> i32 { unsafe { dsn_call2(DSN_SYS_BUTTON_HINTS, labels.as_ptr() as usize, labels.len()) } }
+#[inline]
 pub fn dsn_time() -> u32 { unsafe { dsn_call0(DSN_SYS_TIME) as u32 } }
 #[inline]
 pub fn dsn_device_id(id: &mut [u8]) -> i32 { unsafe { dsn_call2(DSN_SYS_DEVICE_ID, id.as_mut_ptr() as usize, id.len()) } }
@@ -275,8 +280,6 @@ pub fn dsn_wifi_connect() -> i32 { unsafe { dsn_call0(DSN_SYS_WIFI_CONNECT) } }
 #[inline]
 pub fn dsn_book_cover(path: &[u8], height: i32, pixels: &mut [u8]) -> i32 { unsafe { dsn_call5(DSN_SYS_BOOK_COVER, path.as_ptr() as usize, path.len(), ((height as u32 & 0xffff)) as usize, pixels.as_mut_ptr() as usize, pixels.len()) } }
 #[inline]
+pub fn dsn_timer_set(interval_ms: u32) -> i32 { unsafe { dsn_call1(DSN_SYS_TIMER_SET, interval_ms as usize) } }
+#[inline]
 pub fn dsn_qr_bitmap(link: &[u8], pixels: &mut [u8]) -> i32 { unsafe { dsn_call4(DSN_SYS_QR_BITMAP, link.as_ptr() as usize, link.len(), pixels.as_mut_ptr() as usize, pixels.len()) } }
-#[inline]
-pub fn dsn_native_stats_mode() -> i32 { unsafe { dsn_call0(DSN_SYS_NATIVE_STATS_MODE) } }
-#[inline]
-pub fn dsn_native_stats(action: i32) -> i32 { unsafe { dsn_call1(DSN_SYS_NATIVE_STATS, ((action as u32 & 0xff)) as usize) } }

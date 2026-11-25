@@ -1,5 +1,7 @@
 #include "DessenFreeInk.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 
@@ -31,7 +33,6 @@ View viewOf(const DeviceContext& device) {
 uint32_t eventOf(const InputSnapshot& in, View view, FreeInkHost::Swipe swipe) {
   if (in.confirm) return DSN_EV_CONFIRM;
   if (in.back) return DSN_EV_BACK;
-  if (swipe == FreeInkHost::WakeTick) return DSN_EV_TIMER;
   uint32_t kind = 0;
   switch (swipe) {
     case FreeInkHost::SwipeUp: kind = DSN_EV_SWIPE_UP; break;
@@ -60,7 +61,7 @@ uint32_t eventOf(const InputSnapshot& in, View view, FreeInkHost::Swipe swipe) {
     const uint32_t kind = in.longPress ? DSN_EV_LONG_PRESS : DSN_EV_TAP;
     return kind | (static_cast<uint32_t>(x) & 0xfff) << 8 | (static_cast<uint32_t>(y) & 0xfff) << 20;
   }
-  return 0;
+  return swipe == FreeInkHost::WakeTick ? DSN_EV_TIMER : 0;
 }
 
 // --- Sanitizers. Everything an app passes is untrusted; these are the only
@@ -94,7 +95,12 @@ Point pin(int32_t x, int32_t y, View view) {
                static_cast<int16_t>((y < 0 ? 0 : y >= view.height ? view.height - 1 : y) + view.originY)};
 }
 
-uint32_t writeDeviceInfo(const DeviceContext& device, View view, uint8_t* out, uint32_t len) {
+static_assert(offsetof(dsn_device_info, hint_height) == 22 && sizeof(dsn_device_info) == 24,
+              "dsn_device_info is read by offset in other languages");
+
+// `hints` is the host's band along the bottom of the panel; the app is told
+// how much of it falls inside its drawable area.
+uint32_t writeDeviceInfo(const DeviceContext& device, View view, int hints, uint8_t* out, uint32_t len) {
   dsn_device_info info{};
   info.width = static_cast<uint16_t>(view.width);
   info.height = static_cast<uint16_t>(view.height);
@@ -108,9 +114,23 @@ uint32_t writeDeviceInfo(const DeviceContext& device, View view, uint8_t* out, u
   info.has_touch = device.hasTouch;
   info.has_buttons = device.hasButtons;
   info.orientation = static_cast<uint8_t>(device.orientation);
+  if (hints > 0) {
+    const int32_t inside = view.originY + view.height - (device.height - hints);
+    info.hint_height = static_cast<uint16_t>(inside < 0 ? 0 : inside > view.height ? view.height : inside);
+  }
   const uint32_t n = len < sizeof info ? len : sizeof info; // older apps may ask for less
   memcpy(out, &info, n);
   return n;
+}
+
+// The overlap of two rectangles; zero-sized at a's corner when they do not meet.
+Rect intersect(Rect a, Rect b) {
+  const int32_t left = a.x > b.x ? a.x : b.x, top = a.y > b.y ? a.y : b.y;
+  const int32_t right = a.right() < b.right() ? a.right() : b.right();
+  const int32_t bottom = a.bottom() < b.bottom() ? a.bottom() : b.bottom();
+  if (right <= left || bottom <= top) return Rect{a.x, a.y, 0, 0};
+  return Rect{static_cast<int16_t>(left), static_cast<int16_t>(top), static_cast<int16_t>(right - left),
+              static_cast<int16_t>(bottom - top)};
 }
 
 Paint paint(uint32_t color) {
@@ -118,13 +138,15 @@ Paint paint(uint32_t color) {
     case DSN_BLACK: return Paint::solid(Color::Black);
     case DSN_LIGHT_GRAY: return Paint::solid(Color::LightGray);
     case DSN_DARK_GRAY: return Paint::solid(Color::DarkGray);
+    case DSN_SCRIM: return Paint::dither(Color::LightGray);
     default: return Paint::solid(Color::White);
   }
 }
 
 TextStyle textStyle(uint32_t font, uint32_t align, uint32_t maxLines, uint32_t flags) {
   TextStyle st;
-  st.font = static_cast<FontId>(font <= DSN_FONT_NOTOSANS_18 ? font : DSN_FONT_SMALL);
+  // FreeInkUI reserves internal slot 3 for its label font.
+  st.font = static_cast<FontId>(font <= DSN_FONT_TITLE ? font : font <= DSN_FONT_NOTOSANS_18 ? font + 1 : DSN_FONT_SMALL);
   st.align = align == DSN_ALIGN_CENTER ? TextAlign::Center : align == DSN_ALIGN_RIGHT ? TextAlign::Right : TextAlign::Left;
   st.maxLines = static_cast<uint8_t>(maxLines < 1 ? 1 : maxLines > 16 ? 16 : maxLines);
   st.bold = flags & DSN_TEXT_BOLD;
@@ -304,8 +326,43 @@ uint32_t FreeInkHost::nextRandom() {
 
 bool FreeInkHost::load(uint8_t* mem, uint32_t len, uint32_t memCap) {
   refresh_ = false;
+  timerInterval_ = 0;
+  clipped_ = clipTouched_ = false;
   state_ = dvm_load(&vm_, mem, len, memCap) ? State::Running : State::Faulted;
   return state_ == State::Running;
+}
+
+
+int FreeInkHost::setTimerInterval(uint32_t interval) {
+  if (interval && (interval < 1000 || interval > 3600000)) return DSN_ERR_INVALID;
+  timerInterval_ = interval;
+  return 0;
+}
+
+bool FreeInkHost::saveContinuation(Continuation& out) const {
+  if (state_ != State::Busy || !vm_.mem) return false;
+  memcpy(out.registers, vm_.x, sizeof(vm_.x));
+  out.timerInterval = timerInterval_;
+  out.pc = vm_.pc;
+  out.memorySize = vm_.mem_size;
+  out.instructions = vm_.icount;
+  out.clip = clip_;
+  out.clipped = clipped_;
+  return true;
+}
+
+bool FreeInkHost::resumeContinuation(const Continuation& saved, int result) {
+  if (state_ != State::Running || !vm_.mem || saved.memorySize != vm_.mem_size ||
+      (saved.pc & 3) || saved.pc >= vm_.mem_size || vm_.mem_size - saved.pc < 4) return false;
+  memcpy(vm_.x, saved.registers, sizeof(vm_.x));
+  vm_.x[0] = 0;
+  vm_.x[10] = static_cast<uint32_t>(result);
+  vm_.pc = saved.pc;
+  vm_.icount = saved.instructions;
+  if (setTimerInterval(saved.timerInterval) != 0) return false;
+  clip_ = saved.clip;
+  clipped_ = saved.clipped;
+  return true;
 }
 
 void FreeInkHost::randomBytesInto(uint8_t* out, uint32_t n) {
@@ -316,6 +373,7 @@ void FreeInkHost::randomBytesInto(uint8_t* out, uint32_t n) {
 State FreeInkHost::step(DrawTarget& target, const DeviceContext& device, const InputSnapshot& input, Swipe swipe,
                         uint32_t budget) {
   if (state_ == State::Exited || state_ == State::Faulted) return state_;
+  if (!vm_.mem) return state_;  // suspended: never poll or execute without guest RAM
   if (state_ == State::Busy) {
     const int code = services_ ? services_->poll() : DSN_ERR_IO;
     if (code == kPending) return state_; // still working; try again next tick
@@ -327,7 +385,13 @@ State FreeInkHost::step(DrawTarget& target, const DeviceContext& device, const I
   }
   target_ = &target;
   device_ = device;
+  // The app's clip lives across steps; the firmware's is put back after each,
+  // so nothing the firmware draws in between is clipped by the app.
+  outerClip_ = target.clipRect();
+  if (clipped_) target.setClipRect(intersect(clip_, outerClip_));
   const int rc = dvm_run(&vm_, budget, onEcall, this);
+  if (clipped_ || clipTouched_) target.setClipRect(outerClip_);
+  clipTouched_ = false;
   target_ = nullptr;
   state_ = rc == kExit     ? State::Exited
            : rc == kWait   ? State::Waiting
@@ -338,14 +402,56 @@ State FreeInkHost::step(DrawTarget& target, const DeviceContext& device, const I
   return state_;
 }
 
+// Splits the app's labels into four printable, NUL-terminated strings and has
+// the host draw them, outside the app's clip (the band is the host's, not the
+// app's). Nothing to draw is not an error: a device without hints ignores it.
+int FreeInkHost::buttonHints(const uint8_t* labels, uint32_t len) {
+  char text[4][DSN_HINT_LABEL_MAX + 1] = {};
+  uint32_t line = 0, used = 0;
+  for (uint32_t i = 0; i < len; i++) {
+    const uint8_t byte = labels[i];
+    if (byte == '\n') {
+      if (++line == 4) return -1;
+      used = 0;
+    } else if (byte < 0x20 || byte == 0x7f || used == DSN_HINT_LABEL_MAX) {
+      return -1;
+    } else {
+      text[line][used++] = static_cast<char>(byte);
+    }
+  }
+  const int height = services_ ? services_->buttonHintsHeight() : 0;
+  if (!target_ || height <= 0 || height > device_.height) return 0;
+  const char* const shown[4] = {text[0], text[1], text[2], text[3]};
+  const Rect band{0, static_cast<int16_t>(device_.height - height), device_.width, static_cast<int16_t>(height)};
+  if (clipped_) target_->setClipRect(outerClip_);
+  services_->drawButtonHints(*target_, band, shown);
+  if (clipped_) target_->setClipRect(intersect(clip_, outerClip_));
+  return 0;
+}
+
+int FreeInkHost::setClip(int32_t x, int32_t y, int32_t w, int32_t h) {
+  clipTouched_ = true;
+  if (w < 0 || h < 0) {
+    clipped_ = false;
+    return target_->setClipRect(outerClip_) ? 0 : DSN_ERR_UNAVAILABLE;
+  }
+  const View view = viewOf(device_);
+  Rect r = clip(x, y, w, h, view);
+  if (r.empty()) r = Rect{view.originX, view.originY, 0, 0}; // a clip nothing gets through
+  if (!target_->setClipRect(intersect(r, outerClip_))) {
+    clipped_ = false;
+    return DSN_ERR_UNAVAILABLE;
+  }
+  clip_ = r;
+  clipped_ = true;
+  return 0;
+}
+
 int FreeInkHost::requestLaunch(int kind, const uint8_t* path, uint32_t pathLen) {
   launch_ = kind == 1   ? Launch::Reader
             : kind == 2 ? Launch::Settings
             : kind == 3 ? Launch::Browser
             : kind == 4 ? Launch::App
-            : kind == 5 ? Launch::NativeStatsPair
-            : kind == 6 ? Launch::NativeStatsRefresh
-              : kind == 7 ? Launch::NativeStatsUnpair
                         : Launch::None;
   launchPath_[0] = '\0';
   if (launch_ == Launch::None) {

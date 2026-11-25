@@ -17,6 +17,8 @@ pub const DSN_SYS_TEXT_BOX: usize = 22;
 pub const DSN_SYS_MEASURE_TEXT: usize = 23;
 pub const DSN_SYS_LINE_HEIGHT: usize = 24;
 pub const DSN_SYS_BITMAP: usize = 25;
+pub const DSN_SYS_SET_CLIP: usize = 26;
+pub const DSN_SYS_BUTTON_HINTS: usize = 27;
 pub const DSN_SYS_TIME: usize = 32;
 pub const DSN_SYS_DEVICE_ID: usize = 33;
 pub const DSN_SYS_CLOCK: usize = 35;
@@ -54,9 +56,8 @@ pub const DSN_SYS_BOOK_PROGRESS: usize = 100;
 pub const DSN_SYS_OPEN_HOME: usize = 101;
 pub const DSN_SYS_WIFI_CONNECT: usize = 103;
 pub const DSN_SYS_BOOK_COVER: usize = 105;
+pub const DSN_SYS_TIMER_SET: usize = 107;
 pub const DSN_SYS_QR_BITMAP: usize = 106;
-pub const DSN_SYS_NATIVE_STATS_MODE: usize = 107;
-pub const DSN_SYS_NATIVE_STATS: usize = 108;
 
 fn call0(n: usize) i32 {
     return asm volatile ("ecall"
@@ -151,6 +152,8 @@ pub fn text_box(x: i32, y: i32, w: i32, h: i32, s: []const u8, font: i32, align_
 pub fn measure_text(s: []const u8, font: i32, flags: i32) u32 { return @as(u32, @bitCast(call3(DSN_SYS_MEASURE_TEXT, @intFromPtr(s.ptr), s.len, @as(usize, (@as(u32, @bitCast(font)) & 0xff) | ((@as(u32, @bitCast(flags)) & 0xff) << 8))))); }
 pub fn line_height(font: i32) i32 { return call1(DSN_SYS_LINE_HEIGHT, @as(usize, (@as(u32, @bitCast(font)) & 0xff))); }
 pub fn bitmap(x: i32, y: i32, w: i32, h: i32, data: []const u8, bw: i32, bh: i32, format: i32, mode: i32, color: i32, rotation: i32) i32 { return call6(DSN_SYS_BITMAP, @as(usize, (@as(u32, @bitCast(x)) & 0xffff) | ((@as(u32, @bitCast(y)) & 0xffff) << 16)), @as(usize, (@as(u32, @bitCast(w)) & 0xffff) | ((@as(u32, @bitCast(h)) & 0xffff) << 16)), @intFromPtr(data.ptr), data.len, @as(usize, (@as(u32, @bitCast(bw)) & 0xffff) | ((@as(u32, @bitCast(bh)) & 0xffff) << 16)), @as(usize, (@as(u32, @bitCast(format)) & 0xff) | ((@as(u32, @bitCast(mode)) & 0xff) << 8) | ((@as(u32, @bitCast(color)) & 0xff) << 16) | ((@as(u32, @bitCast(rotation)) & 0xff) << 24))); }
+pub fn set_clip(x: i32, y: i32, w: i32, h: i32) i32 { return call2(DSN_SYS_SET_CLIP, @as(usize, (@as(u32, @bitCast(x)) & 0xffff) | ((@as(u32, @bitCast(y)) & 0xffff) << 16)), @as(usize, (@as(u32, @bitCast(w)) & 0xffff) | ((@as(u32, @bitCast(h)) & 0xffff) << 16))); }
+pub fn button_hints(labels: []const u8) i32 { return call2(DSN_SYS_BUTTON_HINTS, @intFromPtr(labels.ptr), labels.len); }
 pub fn time() u32 { return @as(u32, @bitCast(call0(DSN_SYS_TIME))); }
 pub fn device_id(id: []u8) i32 { return call2(DSN_SYS_DEVICE_ID, @intFromPtr(id.ptr), id.len); }
 pub fn clock(t: []u8) i32 { return call2(DSN_SYS_CLOCK, @intFromPtr(t.ptr), t.len); }
@@ -188,6 +191,5 @@ pub fn book_progress(path: []const u8) i32 { return call2(DSN_SYS_BOOK_PROGRESS,
 pub fn open_home(dest: i32) i32 { return call1(DSN_SYS_OPEN_HOME, @as(usize, (@as(u32, @bitCast(dest)) & 0xff))); }
 pub fn wifi_connect() i32 { return call0(DSN_SYS_WIFI_CONNECT); }
 pub fn book_cover(path: []const u8, height: i32, pixels: []u8) i32 { return call5(DSN_SYS_BOOK_COVER, @intFromPtr(path.ptr), path.len, @as(usize, (@as(u32, @bitCast(height)) & 0xffff)), @intFromPtr(pixels.ptr), pixels.len); }
+pub fn timer_set(interval_ms: u32) i32 { return call1(DSN_SYS_TIMER_SET, @as(usize, interval_ms)); }
 pub fn qr_bitmap(link: []const u8, pixels: []u8) i32 { return call4(DSN_SYS_QR_BITMAP, @intFromPtr(link.ptr), link.len, @intFromPtr(pixels.ptr), pixels.len); }
-pub fn native_stats_mode() i32 { return call0(DSN_SYS_NATIVE_STATS_MODE); }
-pub fn native_stats(action: i32) i32 { return call1(DSN_SYS_NATIVE_STATS, @as(usize, (@as(u32, @bitCast(action)) & 0xff))); }
