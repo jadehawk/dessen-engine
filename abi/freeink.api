@@ -105,3 +105,7 @@
 105 book_cover(buf path, u16 height, out pixels) -> i32 : result = svcBookCover(self, path, path_len, height, pixels, pixels_len);
 107 timer_set(u32 interval_ms) -> i32 : result = self.setTimerInterval(interval_ms);
 106 qr_bitmap(buf link, out pixels) -> i32 : result = self.services() ? self.services()->qrBitmap(reinterpret_cast<const char*>(link), link_len, pixels, pixels_len) : DSN_ERR_UNAVAILABLE;
+
+# --- read-only reading history ---
+108 reading_stats_start(buf book, u32 anchor_day) -> i32 : return self.beginReadingStats(book, book_len, anchor_day);
+109 reading_stats_read(u32 kind, u32 first, out data) -> i32 : result = self.services() ? self.services()->readingStatsRead(kind, first, data, data_len) : DSN_ERR_UNAVAILABLE;

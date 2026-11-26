@@ -181,6 +181,51 @@ Calls that can fail on bad input (`text_box`, `bitmap`) return `-1`; check it
 during development. The host silently refuses anything out of range — it never
 trusts an app value — so a bug draws nothing rather than corrupting the device.
 
+## Native reading history
+
+Optional local reading-history service. Detect it with
+`dsn_reading_stats_read(DSN_STATS_CAPABILITY, 0, buffer, 0)` (Rust: use an empty
+mutable slice). Version 1 is supported when it returns 1. Older runtimes can
+return -1 for an unknown call; an unsupported host returns -4. Do not interpret
+a negative result as an empty history. On CrossPoint the application must already
+have read access to the session log.
+
+- `dsn_reading_stats_start(book, book_len, anchor_day)`: async query; the VM is
+  parked until the host completes it. Pass an empty book for device totals,
+  a 32-hex document ID, or an authorized book path. The anchor is a local Unix
+  day number; 0 means use the latest valid recorded date. Returns 0 on success,
+  1 for absent history, or an error (including -6 for insufficient memory).
+- `dsn_reading_stats_read(kind, first, out, out_len)`: read only the completed
+  query's results. Integers are unsigned little-endian. Return value is bytes
+  written, except the capability probe and release. No output on failure.
+- Kind 1 (summary): first=0, exactly 192 bytes written to a buffer of at least
+  that size. Offsets 0,4,8,12,16,20,24,28 are u32: version, flags (bit0 book
+  count limited, bit1 unfinished tail), anchor day, latest day, active days
+  in window, selected book active days, distinct book count, reserved zero.
+  Offsets 32 and 40 are u64 byte count and rejected lines. At 48 and 104 are
+  56-byte overall and selected-book totals respectively: u64 seconds, sessions,
+  dated sessions, then four u64 morning/afternoon/evening/night durations.
+  At 160 are four u64 durations for the seven days ending at the anchor.
+- Kind 2 (days): first is a local Unix day in the 371-day window ending at the
+  anchor; each 16-byte record contains overall and selected-book seconds (u64).
+  Missing day buckets are zero, and only dates through the anchor are returned.
+- Kind 3 (books): first is a zero-based index; each record is a packed 16-byte
+  document ID. The host retains up to 1024 distinct IDs in ascending order and
+  reports overflow in the summary. End of index returns zero.
+- Day and book page buffers must contain 1–64 whole 16-byte records.
+- Kind 4 (release): first=0, empty output; drops the completed query and releases
+  memory. Call before networking; a host can also discard results at that point.
+- Kind 5 (book metadata): first is a zero-based index; 1–8 whole 100-byte records.
+  Bytes 0–15 hold the packed ID, 16–17 the u16 progress in basis points (65535
+  means unavailable), 18 the title byte length (0–80), 19 reserved, 20–99 the
+  zero-padded UTF-8 title. End returns zero. Metadata reflects the last recorded
+  session, not live EPUB state.
+
+Only complete JSONL sessions are counted. Unknown dates contribute to lifetime
+totals, not the calendar or time-of-day totals. Read the selected-book counters
+only when a book was requested. Optional extended metrics are not
+part of this version. The service does not change or upload reading history.
+
 ## Laying out a screen
 
 The firmware's fonts and components give you the device's look for free, but a

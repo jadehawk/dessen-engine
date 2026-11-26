@@ -664,3 +664,27 @@ case 106: { // qr_bitmap
   a[0] = result;
   break;
 }
+case 108: { // reading_stats_start
+  const uint32_t book_len = a[1];
+  const uint8_t* book = static_cast<const uint8_t*>(dvm_ptr(vm, a[0], book_len));
+  (void)book_len;
+  if (!book) { a[0] = static_cast<uint32_t>(-1); break; }
+  const uint32_t anchor_day = static_cast<uint32_t>(a[2]); (void)anchor_day;
+  uint32_t result = 0;
+  return self.beginReadingStats(book, book_len, anchor_day);
+  a[0] = result;
+  break;
+}
+case 109: { // reading_stats_read
+  const uint32_t kind = static_cast<uint32_t>(a[0]); (void)kind;
+  const uint32_t first = static_cast<uint32_t>(a[1]); (void)first;
+  const uint32_t data_len = a[3];
+  uint8_t* data = static_cast<uint8_t*>(dvm_ptr(vm, a[2], data_len));
+  (void)data_len;
+  const uint32_t data_addr = a[2]; (void)data_addr;
+  if (!data) { a[0] = static_cast<uint32_t>(-1); break; }
+  uint32_t result = 0;
+  result = self.services() ? self.services()->readingStatsRead(kind, first, data, data_len) : DSN_ERR_UNAVAILABLE;
+  a[0] = result;
+  break;
+}

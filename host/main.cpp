@@ -12,6 +12,37 @@
 #include "DessenFreeInk.h"
 #include "TraceTarget.h"
 
+// Only enabled by an explicit desktop test flag. Wire fixtures exercise the
+// guest's provider selection without linking firmware or touching real SD data.
+class HistoryFixtureServices : public dessen::DesktopServices {
+ public:
+  using DesktopServices::DesktopServices;
+  int readingStatsStart(const uint8_t*, uint32_t, uint32_t) override {
+    if (!getenv("DESSEN_TEST_NATIVE_STATS")) return -4;
+    ready = true;
+    return 0;
+  }
+  int readingStatsRead(uint32_t kind, uint32_t first, uint8_t* out, uint32_t cap) override {
+    if (!getenv("DESSEN_TEST_NATIVE_STATS")) return -4;
+    if (kind == 0) return 1;
+    if (kind == 4) { ready = false; return 0; }
+    if (!ready) return -1;
+    if (kind == 1) return fsRead("/.crosspoint/test-native-summary.bin",out,cap);
+    if (kind == 2) {
+      uint8_t header[192]{};
+      if (fsRead("/.crosspoint/test-native-summary.bin",header,sizeof header) != 192) return -2;
+      uint32_t anchor = 0;
+      for (unsigned i=0;i<4;++i) anchor |= uint32_t(header[8+i]) << (8*i);
+      if (anchor < 370 || first < anchor-370 || first > anchor) return -1;
+      return fsReadAt("/.crosspoint/test-native-days.bin",(first-anchor+370)*16,out,cap);
+    }
+    if (kind == 5) return fsReadAt("/.crosspoint/test-native-books.bin",first*100,out,cap);
+    return -1;
+  }
+ private:
+  bool ready = false;
+};
+
 int main(int argc, char** argv) {
   if (argc != 2) return fprintf(stderr, "usage: %s app.bin\n", argv[0]), 2;
   FILE* f = fopen(argv[1], "rb");
@@ -29,7 +60,7 @@ int main(int argc, char** argv) {
   const char* fsRoot = getenv("DESSEN_FS_ROOT");
   const char* netRoot = getenv("DESSEN_NET_ROOT");
   const char* appDir = getenv("DESSEN_APP_DIR");
-  dessen::DesktopServices services(fsRoot ? fsRoot : "", appDir ? appDir : "/app", netRoot ? netRoot : "");
+  HistoryFixtureServices services(fsRoot ? fsRoot : "", appDir ? appDir : "/app", netRoot ? netRoot : "");
   host.setServices(&services);
 
   // Test-only paint above the ELF's BSS; measure the deepest actual stack writes.
@@ -57,6 +88,10 @@ int main(int argc, char** argv) {
     if (at != std::string::npos) {
       services.recentsFixture.replace(at, 3, "37\t#6 - Saga of the Forgotten Mountain\n");
     }
+  }
+  if (getenv("DESSEN_TEST_FINISHED_BOOK")) {
+    const auto at = services.recentsFixture.find("37\n");
+    if (at != std::string::npos) services.recentsFixture.replace(at,3,"100\n");
   }
   if (getenv("DESSEN_TEST_ONE_BOOK")) {
     const size_t first = services.recentsFixture.find('\n');

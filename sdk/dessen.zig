@@ -58,6 +58,8 @@ pub const DSN_SYS_WIFI_CONNECT: usize = 103;
 pub const DSN_SYS_BOOK_COVER: usize = 105;
 pub const DSN_SYS_TIMER_SET: usize = 107;
 pub const DSN_SYS_QR_BITMAP: usize = 106;
+pub const DSN_SYS_READING_STATS_START: usize = 108;
+pub const DSN_SYS_READING_STATS_READ: usize = 109;
 
 fn call0(n: usize) i32 {
     return asm volatile ("ecall"
@@ -193,3 +195,5 @@ pub fn wifi_connect() i32 { return call0(DSN_SYS_WIFI_CONNECT); }
 pub fn book_cover(path: []const u8, height: i32, pixels: []u8) i32 { return call5(DSN_SYS_BOOK_COVER, @intFromPtr(path.ptr), path.len, @as(usize, (@as(u32, @bitCast(height)) & 0xffff)), @intFromPtr(pixels.ptr), pixels.len); }
 pub fn timer_set(interval_ms: u32) i32 { return call1(DSN_SYS_TIMER_SET, @as(usize, interval_ms)); }
 pub fn qr_bitmap(link: []const u8, pixels: []u8) i32 { return call4(DSN_SYS_QR_BITMAP, @intFromPtr(link.ptr), link.len, @intFromPtr(pixels.ptr), pixels.len); }
+pub fn reading_stats_start(book: []const u8, anchor_day: u32) i32 { return call3(DSN_SYS_READING_STATS_START, @intFromPtr(book.ptr), book.len, @as(usize, anchor_day)); }
+pub fn reading_stats_read(kind: u32, first: u32, data: []u8) i32 { return call4(DSN_SYS_READING_STATS_READ, @as(usize, kind), @as(usize, first), @intFromPtr(data.ptr), data.len); }

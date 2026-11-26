@@ -58,6 +58,8 @@ pub const DSN_SYS_WIFI_CONNECT: usize = 103;
 pub const DSN_SYS_BOOK_COVER: usize = 105;
 pub const DSN_SYS_TIMER_SET: usize = 107;
 pub const DSN_SYS_QR_BITMAP: usize = 106;
+pub const DSN_SYS_READING_STATS_START: usize = 108;
+pub const DSN_SYS_READING_STATS_READ: usize = 109;
 
 #[inline]
 unsafe fn dsn_call0(n: usize) -> i32 {
@@ -283,3 +285,7 @@ pub fn dsn_book_cover(path: &[u8], height: i32, pixels: &mut [u8]) -> i32 { unsa
 pub fn dsn_timer_set(interval_ms: u32) -> i32 { unsafe { dsn_call1(DSN_SYS_TIMER_SET, interval_ms as usize) } }
 #[inline]
 pub fn dsn_qr_bitmap(link: &[u8], pixels: &mut [u8]) -> i32 { unsafe { dsn_call4(DSN_SYS_QR_BITMAP, link.as_ptr() as usize, link.len(), pixels.as_mut_ptr() as usize, pixels.len()) } }
+#[inline]
+pub fn dsn_reading_stats_start(book: &[u8], anchor_day: u32) -> i32 { unsafe { dsn_call3(DSN_SYS_READING_STATS_START, book.as_ptr() as usize, book.len(), anchor_day as usize) } }
+#[inline]
+pub fn dsn_reading_stats_read(kind: u32, first: u32, data: &mut [u8]) -> i32 { unsafe { dsn_call4(DSN_SYS_READING_STATS_READ, kind as usize, first as usize, data.as_mut_ptr() as usize, data.len()) } }

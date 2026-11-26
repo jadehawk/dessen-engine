@@ -55,7 +55,29 @@ static void testAsync(const char* appPath) {
   assert(f && "asynctest.bin missing");
   const uint32_t n = static_cast<uint32_t>(fread(mem2, 1, sizeof mem2, f));
   fclose(f);
-  ParkingNet net;
+  struct StatsAndNetwork : ParkingNet {
+    bool stats = false;
+    bool released = false;
+    int readingStatsStart(const uint8_t* id, uint32_t n, uint32_t anchor) override {
+      assert(n == 32 && id[0] == 'a' && anchor == 20000);
+      stats = true;
+      countdown = 3;
+      return dessen::kPending;
+    }
+    int readingStatsRead(uint32_t kind, uint32_t first, uint8_t* out, uint32_t cap) override {
+      assert(first == 0);
+      if (kind == DSN_STATS_CAPABILITY) return DSN_STATS_VERSION;
+      if (kind == DSN_STATS_RELEASE) { released = true; return 0; }
+      assert(kind == DSN_STATS_BOOKS && cap == 16 && stats && countdown == 0);
+      memset(out, 0xaa, cap);
+      return cap;
+    }
+    int poll() override {
+      if (!stats) return ParkingNet::poll();
+      ++polls;
+      return --countdown > 0 ? dessen::kPending : 0;
+    }
+  } net;
   dessen::FreeInkHost host;
   assert(host.load(mem2, n, sizeof mem2));
   host.setServices(&net);
@@ -74,7 +96,7 @@ static void testAsync(const char* appPath) {
   assert(st == dessen::State::Exited);
   assert(host.exitCode() == 0);    // app validated the canned response
   assert(busyTicks >= 2);          // it really parked across ticks
-  assert(net.polls >= 3);
+  assert(net.polls >= 6 && net.released);
 }
 
 

@@ -65,6 +65,10 @@ class Services {
   virtual int recentShelf(uint32_t, uint32_t, char*, uint32_t) { return -4; }
   // Saved reading progress for a book: 0-100, or -1 if none.
   virtual int bookProgress(const char*) { return -1; }
+
+  // Reading history: a parked query followed by bounded reads of its results.
+  virtual int readingStatsStart(const uint8_t*, uint32_t, uint32_t) { return -4; }
+  virtual int readingStatsRead(uint32_t, uint32_t, uint8_t*, uint32_t) { return -4; }
   // A book's cover as a 1-bit bitmap scaled to `height`: writes {u16 w, u16 h}
   // then w*h MSB-first bits. Returns bytes written, 0 if the book has no cover,
   // or DSN_ERR_UNAVAILABLE where covers aren't supported (no PSRAM). May be slow

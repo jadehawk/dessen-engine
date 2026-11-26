@@ -120,6 +120,25 @@ typedef struct {
 #define DSN_SHELF_PAGE_MAX 8
 #define DSN_SHELF_RECORD_MAX (DSN_BOOK_PATH_MAX + 2 * 255 + 6)
 
+// reading_stats_read kinds; fixed little-endian records (see writing-apps.md).
+#define DSN_STATS_CAPABILITY 0
+#define DSN_STATS_SUMMARY 1
+#define DSN_STATS_DAYS 2
+#define DSN_STATS_BOOKS 3
+#define DSN_STATS_RELEASE 4
+#define DSN_STATS_BOOK_INFO 5
+#define DSN_STATS_VERSION 1
+#define DSN_STATS_SUMMARY_BYTES 192
+#define DSN_STATS_DAY_BYTES 16
+#define DSN_STATS_BOOK_BYTES 16
+#define DSN_STATS_BOOK_INFO_BYTES 100
+#define DSN_STATS_BOOK_INFO_MAX 8
+#define DSN_STATS_PAGE_MAX 64
+#define DSN_STATS_NO_HISTORY 1
+#define DSN_STATS_NO_MEMORY (-6)
+#define DSN_STATS_BOOKS_LIMITED 1u
+#define DSN_STATS_INCOMPLETE_TAIL 2u
+
 // open_home() destinations (the firmware's home-screen menu items).
 #define DSN_HOME_FILES 0
 #define DSN_HOME_LIBRARY 1

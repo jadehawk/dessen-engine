@@ -129,3 +129,5 @@ static inline int dsn_wifi_connect(void) { return (int)dsn_call0(DSN_SYS_WIFI_CO
 static inline int dsn_book_cover(const void *path, int path_len, int height, void *pixels, int pixels_len) { return (int)dsn_call5(DSN_SYS_BOOK_COVER, (long)path, path_len, (long)(((unsigned)height & 0xffff)), (long)pixels, pixels_len); }
 static inline int dsn_timer_set(unsigned interval_ms) { return (int)dsn_call1(DSN_SYS_TIMER_SET, (long)interval_ms); }
 static inline int dsn_qr_bitmap(const void *link, int link_len, void *pixels, int pixels_len) { return (int)dsn_call4(DSN_SYS_QR_BITMAP, (long)link, link_len, (long)pixels, pixels_len); }
+static inline int dsn_reading_stats_start(const void *book, int book_len, unsigned anchor_day) { return (int)dsn_call3(DSN_SYS_READING_STATS_START, (long)book, book_len, (long)anchor_day); }
+static inline int dsn_reading_stats_read(unsigned kind, unsigned first, void *data, int data_len) { return (int)dsn_call4(DSN_SYS_READING_STATS_READ, (long)kind, (long)first, (long)data, data_len); }

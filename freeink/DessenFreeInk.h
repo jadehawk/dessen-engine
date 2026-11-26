@@ -63,6 +63,7 @@ class FreeInkHost {
   int beginTextInput(const char* prompt, uint8_t* out, uint32_t cap);
   int beginKeygen(uint32_t bits, uint8_t* pub, uint32_t pubCap, uint8_t* priv, uint32_t privCap);
   int beginWifi();
+  int beginReadingStats(const uint8_t* book, uint32_t bookLen, uint32_t anchorDay);
   int requestLaunch(int kind, const uint8_t* path, uint32_t pathLen); // open_book/settings/browser
   int requestLaunchHome(int dest);                                   // open_home
   int setClip(int32_t x, int32_t y, int32_t w, int32_t h);           // set_clip

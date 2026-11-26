@@ -519,6 +519,15 @@ int FreeInkHost::beginTextInput(const char* prompt, uint8_t* out, uint32_t cap) 
   return 0;
 }
 
+int FreeInkHost::beginReadingStats(const uint8_t* book, uint32_t bookLen, uint32_t anchorDay) {
+  if (!services_) { vm_.x[10] = u(DSN_ERR_UNAVAILABLE); return 0; }
+  if (bookLen > DSN_BOOK_PATH_MAX) { vm_.x[10] = u(DSN_ERR_INVALID); return 0; }
+  const int code = services_->readingStatsStart(book, bookLen, anchorDay);
+  if (code == kPending) return kBusy;
+  vm_.x[10] = u(code);
+  return 0;
+}
+
 int FreeInkHost::beginWifi() {
   if (!services_) { vm_.x[10] = u(DSN_ERR_UNAVAILABLE); return 0; }
   const int code = services_->wifiConnectStart();

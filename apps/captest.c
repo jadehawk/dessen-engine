@@ -93,6 +93,10 @@ int main(void) {
   unsigned char xyz[6];
   CHECK(32, dsn_accel(xyz, 6) == 6);
 
+  // Unsupported native reading history is discoverable on hosts without it.
+  CHECK(41, dsn_reading_stats_read(DSN_STATS_CAPABILITY, 0, back, 0) == DSN_ERR_UNAVAILABLE);
+  CHECK(42, dsn_reading_stats_start("", 0, 0) == DSN_ERR_UNAVAILABLE);
+
   // --- keystore ---
   CHECK(33, dsn_keystore("/book.epub", 10, secret, 16, 0) == 0);
   return 0;
