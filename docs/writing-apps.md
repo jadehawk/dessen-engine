@@ -206,6 +206,16 @@ have read access to the session log.
   56-byte overall and selected-book totals respectively: u64 seconds, sessions,
   dated sessions, then four u64 morning/afternoon/evening/night durations.
   At 160 are four u64 durations for the seven days ending at the anchor.
+- Optional source provenance (kind 7): with the host's optional history identity
+  grant, first=2 probes support, first=0 reads the 40-byte descriptor (u32 version,
+  u32 owned, 16-byte source ID, u64 prefix bytes, u64 source hash), and first=1
+  with empty output binds an unowned source to this reader. Binding requires
+  explicit user confirmation in the app and invalidates the current query.
+  Mixed or foreign histories cannot be bound or exported. No physical reader
+  ID is returned by this descriptor. Host implementations may support a
+  pinned prefix selector `@<16 hex byte count>:<optional 32-hex document ID>`
+  in the query's book argument. Kind 8 reads one inventory record (16-byte ID,
+  u32 latest source line offset). All numeric fields are little-endian.
 - Kind 2 (days): first is a local Unix day in the 371-day window ending at the
   anchor; each 16-byte record contains overall and selected-book seconds (u64).
   Missing day buckets are zero, and only dates through the anchor are returned.

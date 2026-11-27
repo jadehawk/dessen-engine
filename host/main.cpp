@@ -17,14 +17,34 @@
 class HistoryFixtureServices : public dessen::DesktopServices {
  public:
   using DesktopServices::DesktopServices;
-  int readingStatsStart(const uint8_t*, uint32_t, uint32_t) override {
+  int readingStatsStart(const uint8_t* key, uint32_t length, uint32_t) override {
     if (!getenv("DESSEN_TEST_NATIVE_STATS")) return -4;
+    ready = false;
+    prefix = false;
+    if (getenv("DESSEN_TEST_HISTORY_UPLOAD")) {
+      const auto* fail = getenv("DESSEN_TEST_HISTORY_QUERY_ERROR");
+      if (fail && starts++ > 0) return atoi(fail);
+      if (length >= 18 && key[0] == '@') {
+        uint64_t bytes = 0;
+        for (unsigned i = 1; i < 17; ++i) {
+          const uint8_t c = key[i];
+          bytes = (bytes << 4) | (c <= '9' ? c - '0' : c - 'a' + 10);
+        }
+        uint8_t saved[40]{};
+        if (fsRead("/.crosspoint/test-native-source-prefix.bin", saved, sizeof(saved)) == 40) {
+          uint64_t old = 0;
+          for (unsigned i = 0; i < 8; ++i) old |= uint64_t(saved[24+i]) << (8*i);
+          prefix = bytes == old;
+        }
+      }
+    }
     ready = true;
     return 0;
   }
   int readingStatsRead(uint32_t kind, uint32_t first, uint8_t* out, uint32_t cap) override {
     if (!getenv("DESSEN_TEST_NATIVE_STATS")) return -4;
     if (kind == 0) return 1;
+    if (kind == 7 && first == 2) return getenv("DESSEN_TEST_HISTORY_UPLOAD") ? 1 : -4;
     if (kind == 4) { ready = false; return 0; }
     if (!ready) return -1;
     if (kind == 1) return fsRead("/.crosspoint/test-native-summary.bin",out,cap);
@@ -37,10 +57,40 @@ class HistoryFixtureServices : public dessen::DesktopServices {
       return fsReadAt("/.crosspoint/test-native-days.bin",(first-anchor+370)*16,out,cap);
     }
     if (kind == 5) return fsReadAt("/.crosspoint/test-native-books.bin",first*100,out,cap);
+    if (getenv("DESSEN_TEST_HISTORY_UPLOAD")) {
+      if (kind == 6) return fsRead("/.crosspoint/test-native-turns.bin",out,cap);
+      if (kind == 7 && first == 0) {
+        if (const auto* fail = getenv("DESSEN_TEST_HISTORY_SOURCE_ERROR")) return atoi(fail);
+        return fsRead(prefix ? "/.crosspoint/test-native-source-prefix.bin" : "/.crosspoint/test-native-source.bin",out,cap);
+      }
+      if (kind == 8) return fsReadAt("/.crosspoint/test-native-offsets.bin",first*20,out,cap);
+    }
     return -1;
+  }
+  int netStart(const char* head, const uint8_t* body, uint32_t n, uint8_t* resp, uint32_t cap) override {
+    // Offline fixture responses are numbered per invocation; capture only
+    // payloads, never request headers or credentials.
+    if (getenv("DESSEN_TEST_HISTORY_UPLOAD") && std::string_view(head).substr(0,4) == "PUT ") {
+      printf("history-request %.*s\n", static_cast<int>(n), reinterpret_cast<const char*>(body));
+      if (cap < 4) return -1;
+      char path[80];
+      snprintf(path,sizeof(path),"/.crosspoint/test-upload-ack-%u.json",requests++);
+      const int got = fsRead(path,resp+4,cap-4);
+      if (got < 0) return got;
+      const auto* status = getenv("DESSEN_TEST_HISTORY_HTTP_STATUS");
+      const int code = status ? atoi(status) : 200;
+      resp[0]=static_cast<uint8_t>(code >> 8); resp[1]=static_cast<uint8_t>(code); resp[2]=resp[3]=0;
+      ready=false;
+      return got;
+    }
+    ready=false;
+    return DesktopServices::netStart(head,body,n,resp,cap);
   }
  private:
   bool ready = false;
+  bool prefix = false;
+  unsigned starts = 0;
+  unsigned requests = 0;
 };
 
 int main(int argc, char** argv) {
