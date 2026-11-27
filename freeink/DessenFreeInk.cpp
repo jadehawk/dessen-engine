@@ -254,6 +254,23 @@ int svcFs(FreeInkHost& self, char mode, const uint8_t* path, uint32_t pathLen, u
   }
 }
 
+int svcScreenshot(FreeInkHost& self, const uint8_t* path, uint32_t len) {
+  auto* s = svc(self);
+  if (!s) return DSN_ERR_UNAVAILABLE;
+  if (!len) return s->screenshot(nullptr);
+  char p[kPathMax + 1];
+  if (!guestPath(path, len, p)) return DSN_ERR_INVALID;
+  return s->screenshot(p);
+}
+
+int svcRename(FreeInkHost& self, const uint8_t* source, uint32_t sn, const uint8_t* dest, uint32_t dn) {
+  auto* s = svc(self);
+  if (!s) return DSN_ERR_UNAVAILABLE;
+  char a[kPathMax + 1], b[kPathMax + 1];
+  if (!guestPath(source, sn, a) || !guestPath(dest, dn, b)) return DSN_ERR_INVALID;
+  return s->fsRename(a, b);
+}
+
 int svcHash(FreeInkHost& self, int algo, const uint8_t* data, uint32_t n, uint8_t* out, uint32_t cap) {
   if (algo != DSN_HASH_SHA1 && algo != DSN_HASH_SHA256) return DSN_ERR_INVALID;
   return svc(self) ? svc(self)->hash(algo, data, n, out, cap) : DSN_ERR_UNAVAILABLE;
@@ -463,6 +480,14 @@ int FreeInkHost::requestLaunch(int kind, const uint8_t* path, uint32_t pathLen) 
     if (!guestPath(path, pathLen, launchPath_, DSN_BOOK_PATH_MAX)) {
       launch_ = Launch::None;
       vm_.x[10] = static_cast<uint32_t>(DSN_ERR_INVALID);
+      return 0;
+    }
+  }
+  if (launch_ == Launch::Reader && services_) {
+    const int allowed = services_->validateBookOpen(launchPath_);
+    if (allowed < 0) {
+      launch_ = Launch::None;
+      vm_.x[10] = static_cast<uint32_t>(allowed);
       return 0;
     }
   }

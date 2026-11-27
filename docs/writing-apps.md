@@ -419,3 +419,15 @@ shape, frontlight, a file read), you add **one line** to
 regenerates both the app-side wrapper and the firmware-side dispatch. See
 `AGENTS.md` for the recipe and the rules every new call must follow (clip, pin,
 bounds-check — every app value is untrusted).
+
+### Screenshots and file renames
+
+The optional generic calls are screenshot (110) and fs_rename (111).
+An empty screenshot path probes capability support (1 means supported).
+A nonempty path captures the current framebuffer as a BMP to a new file.
+The host checks write permission, rejects shared credential paths, and
+does not overwrite existing files. Rename moves a regular file without
+copying it through guest memory. It requires read and delete permission on
+the source and write permission on the destination, rejects shared credentials
+and existing destinations, and reports errors through the normal DSN codes.
+Apps are responsible for staging, backup and restoration policy.

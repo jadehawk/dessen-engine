@@ -109,3 +109,7 @@
 # --- read-only reading history ---
 108 reading_stats_start(buf book, u32 anchor_day) -> i32 : return self.beginReadingStats(book, book_len, anchor_day);
 109 reading_stats_read(u32 kind, u32 first, out data) -> i32 : result = self.services() ? self.services()->readingStatsRead(kind, first, data, data_len) : DSN_ERR_UNAVAILABLE;
+
+# --- generic filesystem operations ---
+110 screenshot(buf path) -> i32 : result = svcScreenshot(self, path, path_len);
+111 fs_rename(buf source, buf dest) -> i32 : result = svcRename(self, source, source_len, dest, dest_len);

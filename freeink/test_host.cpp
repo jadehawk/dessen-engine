@@ -224,6 +224,11 @@ static void testDesktopStorage() {
   assert(service.fsWrite("/saved", original, sizeof original) == 0);
   assert(fixtureWriter.fsWrite("/example.test/book", replacement, sizeof replacement) == 0);
   assert(service.fsRead("/link", output, sizeof output) == DSN_ERR_IO);
+  assert(service.fsRename("/link", "/moved") == DSN_ERR_IO);
+  assert(service.fsRename("/saved", "/redirect/moved") == DSN_ERR_IO);
+  assert(service.fsRename("/saved", "/moved") == 0);
+  assert(service.fsRename("/moved", "/saved") == 0);
+  assert(!fs::exists(fixtures / "moved"));
   assert(service.fsWrite("/redirect/untouched", original, sizeof original) == DSN_ERR_IO);
   assert(!fs::exists(fixtures / "untouched"));
   assert(service.fetchStart("https://example.test/book", "/link") == DSN_ERR_IO);

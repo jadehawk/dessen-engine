@@ -30,6 +30,7 @@ class DesktopServices : public Services {
   int fsReadAt(const char* path, uint32_t offset, uint8_t* out, uint32_t cap) override;
   int fsWrite(const char* path, const uint8_t* data, uint32_t n) override;
   int fsList(const char* path, char* out, uint32_t cap) override;
+  int fsRename(const char* source, const char* dest) override;
   int fsDelete(const char* path) override;
   int fsAppDir(char* out, uint32_t cap) override;
   int keystore(const char* path, const uint8_t* key, uint32_t n, uint32_t expires) override;

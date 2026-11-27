@@ -38,6 +38,15 @@ int main(void) {
   char listing[256];
   int ln = dsn_fs_list("/", 1, listing, sizeof listing);
   CHECK(8, ln > 0);
+  CHECK(43, dsn_fs_rename("/captest.bin", 12, "/moved.bin", 10) == 0);
+  CHECK(44, dsn_fs_read("/captest.bin", 12, back, sizeof back) == DSN_ERR_IO);
+  CHECK(45, dsn_fs_read("/moved.bin", 10, back, sizeof back) == sizeof payload && eq(payload, back, sizeof payload));
+  CHECK(46, dsn_fs_write("/captest.bin", 12, payload, sizeof payload) == 0);
+  CHECK(47, dsn_fs_rename("/moved.bin", 10, "/captest.bin", 12) == DSN_ERR_IO);
+  CHECK(48, dsn_fs_rename("/../escape", 10, "/x", 2) == DSN_ERR_INVALID);
+  CHECK(49, dsn_screenshot("/../escape", 10) == DSN_ERR_INVALID);
+  CHECK(50, dsn_screenshot("", 0) == DSN_ERR_UNAVAILABLE);
+  CHECK(51, dsn_fs_delete("/moved.bin", 10) == 0);
   CHECK(9, dsn_fs_delete("/captest.bin", 12) == 0);
   CHECK(10, dsn_fs_read("/captest.bin", 12, back, sizeof back) == DSN_ERR_IO);
   CHECK(11, dsn_fs_read("/../escape", 10, back, sizeof back) == DSN_ERR_INVALID); // path rules

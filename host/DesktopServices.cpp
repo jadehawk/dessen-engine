@@ -283,6 +283,21 @@ int DesktopServices::fsList(const char* path, char* out, uint32_t cap) {
                                     reinterpret_cast<uint8_t*>(out), cap);
 }
 
+int DesktopServices::fsRename(const char* source, const char* dest) {
+  if (fsRoot_.empty()) return DSN_ERR_UNAVAILABLE;
+  std::string a, b;
+  const Fd from{openParent(fsRoot_, source, a)}, to{openParent(fsRoot_, dest, b)};
+  if (from.value < 0 || to.value < 0 || a == "." || b == ".") return DSN_ERR_IO;
+  struct stat st;
+  if (fstatat(from.value, a.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0 || !S_ISREG(st.st_mode))
+    return DSN_ERR_IO;
+  // Publish without replacement, including when another process creates dest.
+  if (linkat(from.value, a.c_str(), to.value, b.c_str(), 0) != 0) return DSN_ERR_IO;
+  if (unlinkat(from.value, a.c_str(), 0) == 0) return 0;
+  unlinkat(to.value, b.c_str(), 0);
+  return DSN_ERR_IO;
+}
+
 int DesktopServices::fsDelete(const char* path) {
   if (fsRoot_.empty()) return DSN_ERR_UNAVAILABLE;
   std::string leaf;

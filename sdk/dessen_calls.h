@@ -131,3 +131,5 @@ static inline int dsn_timer_set(unsigned interval_ms) { return (int)dsn_call1(DS
 static inline int dsn_qr_bitmap(const void *link, int link_len, void *pixels, int pixels_len) { return (int)dsn_call4(DSN_SYS_QR_BITMAP, (long)link, link_len, (long)pixels, pixels_len); }
 static inline int dsn_reading_stats_start(const void *book, int book_len, unsigned anchor_day) { return (int)dsn_call3(DSN_SYS_READING_STATS_START, (long)book, book_len, (long)anchor_day); }
 static inline int dsn_reading_stats_read(unsigned kind, unsigned first, void *data, int data_len) { return (int)dsn_call4(DSN_SYS_READING_STATS_READ, (long)kind, (long)first, (long)data, data_len); }
+static inline int dsn_screenshot(const void *path, int path_len) { return (int)dsn_call2(DSN_SYS_SCREENSHOT, (long)path, path_len); }
+static inline int dsn_fs_rename(const void *source, int source_len, const void *dest, int dest_len) { return (int)dsn_call4(DSN_SYS_FS_RENAME, (long)source, source_len, (long)dest, dest_len); }

@@ -688,3 +688,27 @@ case 109: { // reading_stats_read
   a[0] = result;
   break;
 }
+case 110: { // screenshot
+  const uint32_t path_len = a[1];
+  const uint8_t* path = static_cast<const uint8_t*>(dvm_ptr(vm, a[0], path_len));
+  (void)path_len;
+  if (!path) { a[0] = static_cast<uint32_t>(-1); break; }
+  uint32_t result = 0;
+  result = svcScreenshot(self, path, path_len);
+  a[0] = result;
+  break;
+}
+case 111: { // fs_rename
+  const uint32_t source_len = a[1];
+  const uint8_t* source = static_cast<const uint8_t*>(dvm_ptr(vm, a[0], source_len));
+  (void)source_len;
+  if (!source) { a[0] = static_cast<uint32_t>(-1); break; }
+  const uint32_t dest_len = a[3];
+  const uint8_t* dest = static_cast<const uint8_t*>(dvm_ptr(vm, a[2], dest_len));
+  (void)dest_len;
+  if (!dest) { a[0] = static_cast<uint32_t>(-1); break; }
+  uint32_t result = 0;
+  result = svcRename(self, source, source_len, dest, dest_len);
+  a[0] = result;
+  break;
+}

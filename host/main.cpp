@@ -17,6 +17,15 @@
 class HistoryFixtureServices : public dessen::DesktopServices {
  public:
   using DesktopServices::DesktopServices;
+  int screenshot(const char* path) override {
+    if (!getenv("DESSEN_TEST_SCREENSHOT")) return DSN_ERR_UNAVAILABLE;
+    if (!path) return 1;
+    uint8_t probe;
+    if (fsReadAt(path, 0, &probe, 1) >= 0) return DSN_ERR_IO;
+    static const uint8_t fixture[] = "BM-test-frame";
+    printf("screenshot %s\n", path);
+    return fsWrite(path, fixture, sizeof fixture);
+  }
   int readingStatsStart(const uint8_t* key, uint32_t length, uint32_t) override {
     if (!getenv("DESSEN_TEST_NATIVE_STATS")) return -4;
     ready = false;

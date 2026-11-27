@@ -47,6 +47,8 @@ class Services {
   virtual int fsRead(const char*, uint8_t*, uint32_t) { return -4; }
   // Up to `cap` bytes starting at `offset`; 0 at or past the end of the file.
   virtual int fsReadAt(const char*, uint32_t, uint8_t*, uint32_t) { return -4; }
+  virtual int screenshot(const char*) { return -4; }
+  virtual int fsRename(const char*, const char*) { return -4; }
   virtual int fsWrite(const char*, const uint8_t*, uint32_t) { return -4; }
   virtual int fsList(const char*, char*, uint32_t) { return -4; }
   virtual int fsDelete(const char*) { return -4; }
@@ -65,6 +67,8 @@ class Services {
   virtual int recentShelf(uint32_t, uint32_t, char*, uint32_t) { return -4; }
   // Saved reading progress for a book: 0-100, or -1 if none.
   virtual int bookProgress(const char*) { return -1; }
+  // Hosts may reject an unavailable or unauthorized book before ending the guest.
+  virtual int validateBookOpen(const char*) { return 0; }
 
   // Reading history: a parked query followed by bounded reads of its results.
   virtual int readingStatsStart(const uint8_t*, uint32_t, uint32_t) { return -4; }
